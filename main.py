@@ -2,7 +2,9 @@ import chess
 import random
 import time
 
-piece_values = [0, 1, 3, 3, 5, 9, 1000]
+from board_tree import find_best_move, BoardTreeNode
+from evaluation_basic import count_material
+
 
 def game_end(chessboard):
     if chessboard.is_checkmate():
@@ -17,13 +19,26 @@ def game_end(chessboard):
 
 
 board = chess.Board()
+
 legal_moves = []
 while not game_end(board):
+    best_move = find_best_move(BoardTreeNode(board, True, 0, None), 3)
+
+    print(best_move)
+    board.push_san(str(best_move))
+    print(board)
+    print("")
+
     legal_moves = list(board.legal_moves)
     board.push_san(str(random.choice(legal_moves)))
     print(board)
     print("")
+
+
 print(board.outcome())
+
+print(count_material(board))
+
 
 
 
