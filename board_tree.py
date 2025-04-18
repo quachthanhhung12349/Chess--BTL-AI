@@ -23,135 +23,101 @@ class BoardTreeNode:
         else:
             self.minimax_value = 1000000
 
+def order_moves(board):
+    return sorted(board.legal_moves,
+                  key=lambda move: (board.gives_check(move), board.is_capture(move)),
+                  reverse=True)
 
 
+def find_best_move(node, max_depth, alpha=-1000000, beta=1000000):
+    # Base case: leaf node evaluation
+    if node.depth == max_depth or node.board.is_game_over():
+        if node.board.is_checkmate():
+            # Assign worst possible value for checkmate
+            node.minimax_value = -1000000 if node.board.turn == chess.WHITE else 1000000
+        else:
+            node.minimax_value = count_material(node.board)
+        return node.minimax_value
 
+    move_order = order_moves(node.board)  # Your move ordering function
 
-def minimax(current_node):
-    if not len(current_node.children):
-        current_node.minimax_value = current_node.evaluation
-        return
-
-    if current_node.color:
+    if node.board.turn == chess.WHITE:  # Maximizing player
         max_value = -1000000
-        max_move = None
-        for node in current_node.children:
-            if max_value < node.evaluation:
-                max_value = node.evaluation
-                max_move = node.move
-        current_node.minimax_value = max_value
-        current_node.minimax_move = max_move
-        return
+        best_move = None
+        for move in move_order:
+            # Create child node
+            temp_board = node.board.copy()
+            temp_board.push(move)
+            child_node = BoardTreeNode(temp_board, not node.color, node.depth + 1, move)
+            node.children.append(child_node)
 
-    min_value = 1000000
-    min_move = None
-    for node in current_node.children:
-        if min_value > node.evaluation:
-            min_value = node.evaluation
-            max_move = node.move
-    current_node.minimax_value = min_value
-    current_node.minimax_move = min_move
-    return
+            # Recursive call with current alpha/beta
+            current_value = find_best_move(child_node, max_depth, alpha, beta)
 
+            # Update max value and best move
+            if current_value > max_value:
+                max_value = current_value
+                best_move = move
+                node.minimax_move = best_move
+                node.minimax_value = max_value
 
-def minimax_alpha_beta(current_node):
-    if not len(current_node.children):
-        current_node.minimax_value = current_node.evaluation
-        return
+            # Update alpha and check pruning
+            alpha = max(alpha, max_value)
+            if alpha >= beta:
+                break  # Beta cutoff
 
-    if current_node.color:
-        max_value = -1000000
-        max_move = None
-        for node in current_node.children:
-            if max_value < node.evaluation:
-                max_value = node.evaluation
-                max_move = node.move
-                if max_value >= current_node.beta:
-                    break
-        current_node.minimax_value = max_value
-        current_node.minimax_move = max_move
-        current_node.alpha = max(current_node.alpha, max_value)
-        return
+        return max_value
 
-    min_value = 1000000
-    min_move = None
-    for node in current_node.children:
-        if min_value > node.evaluation:
-            min_value = node.evaluation
-            min_move = node.move
-            if min_value <= current_node.alpha:
-                break
-    current_node.minimax_value = min_value
-    current_node.minimax_move = min_move
-    current_node.beta = min(current_node.beta, min_value)
-    return
+    else:  # Minimizing player
+        min_value = 1000000
+        best_move = None
+        for move in move_order:
+            # Create child node
+            temp_board = node.board.copy()
+            temp_board.push(move)
+            child_node = BoardTreeNode(temp_board, not node.color, node.depth + 1, move)
+            node.children.append(child_node)
 
+            # Recursive call with current alpha/beta
+            current_value = find_best_move(child_node, max_depth, alpha, beta)
 
-def find_best_move(root_node, max_depth):
-    stack = [(root_node, False)]
+            # Update min value and best move
+            if current_value < min_value:
+                min_value = current_value
+                best_move = move
+                node.minimax_move = best_move
+                node.minimax_value = min_value
 
-    while stack:
-        node, is_processed = stack.pop()
+            # Update beta and check pruning
+            beta = min(beta, min_value)
+            if alpha >= beta:
+                break  # Alpha cutoff
 
-        if node.depth >= max_depth:
-            continue
-
-        if not is_processed:
-            for move in node.board.legal_moves:
-                node.board.push(move)
-                temp_board = node.board.copy()
-                node.board.pop()
-
-                child_node = BoardTreeNode(temp_board, not node.color, node.depth + 1, move)
-
-                node.children.append(child_node)
-                stack.append((child_node, False))
-            minimax(node)
-            stack.append((node, True))
-    return root_node.minimax_move
-
-def find_best_move_alpha_beta(root_node, max_depth):
-    stack = [(root_node, False)]
-
-    while stack:
-        node, is_processed = stack.pop()
-
-        if node.depth >= max_depth:
-            continue
-
-        if not is_processed:
-            for move in node.board.legal_moves:
-                node.board.push(move)
-                temp_board = node.board.copy()
-                node.board.pop()
-
-                child_node = BoardTreeNode(temp_board, not node.color, node.depth + 1, move)
+        return min_value
 
 
 
-                node.children.append(child_node)
-                stack.append((child_node, False))
-            minimax_alpha_beta(node)
-            stack.append((node, True))
-    return root_node.minimax_move
+if __name__ == "__main__":
+    board1 = chess.Board()
+    board1.push_san("e2e4")
+    board1.push_san("e7e5")
+    board1.push_san("g1f3")
+    board1.push_san("b8c6")
+    board1.push_san("f1c4")
+    board1.push_san("c6d4")
+    board1.push_san("f3e5")
+    board1.push_san("d8g5")
+    board1.push_san("e5f7")
+
+    node1 = BoardTreeNode(board1, True, 0, None)
 
 
+    tic = time.perf_counter()
+    print(find_best_move(node1, 4))
+    print(node1.minimax_move)
 
-board1 = chess.Board()
-
-node1 = BoardTreeNode(board1, True, 0, None)
-
-tic = time.perf_counter()
-print(find_best_move(node1, 3))
-
-toc = time.perf_counter()
-print(toc-tic)
-
-tic = time.perf_counter()
-print(find_best_move_alpha_beta(node1, 3))
-
-toc = time.perf_counter()
-print(toc-tic)
+    toc = time.perf_counter()
+    print(toc-tic)
 
 
 
