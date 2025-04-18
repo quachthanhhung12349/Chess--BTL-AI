@@ -30,18 +30,17 @@ def order_moves(board):
 
 
 def find_best_move(node, max_depth, alpha=-1000000, beta=1000000):
-    # Base case: leaf node evaluation
+
     if node.depth == max_depth or node.board.is_game_over():
         if node.board.is_checkmate():
-            # Assign worst possible value for checkmate
             node.minimax_value = -1000000 if node.board.turn == chess.WHITE else 1000000
         else:
             node.minimax_value = count_material(node.board)
         return node.minimax_value
 
-    move_order = order_moves(node.board)  # Your move ordering function
+    move_order = order_moves(node.board)
 
-    if node.board.turn == chess.WHITE:  # Maximizing player
+    if node.board.turn == chess.WHITE:
         max_value = -1000000
         best_move = None
         for move in move_order:
@@ -51,7 +50,6 @@ def find_best_move(node, max_depth, alpha=-1000000, beta=1000000):
             child_node = BoardTreeNode(temp_board, not node.color, node.depth + 1, move)
             node.children.append(child_node)
 
-            # Recursive call with current alpha/beta
             current_value = find_best_move(child_node, max_depth, alpha, beta)
 
             # Update max value and best move
@@ -61,10 +59,9 @@ def find_best_move(node, max_depth, alpha=-1000000, beta=1000000):
                 node.minimax_move = best_move
                 node.minimax_value = max_value
 
-            # Update alpha and check pruning
             alpha = max(alpha, max_value)
             if alpha >= beta:
-                break  # Beta cutoff
+                break
 
         return max_value
 
@@ -78,20 +75,17 @@ def find_best_move(node, max_depth, alpha=-1000000, beta=1000000):
             child_node = BoardTreeNode(temp_board, not node.color, node.depth + 1, move)
             node.children.append(child_node)
 
-            # Recursive call with current alpha/beta
             current_value = find_best_move(child_node, max_depth, alpha, beta)
 
-            # Update min value and best move
             if current_value < min_value:
                 min_value = current_value
                 best_move = move
                 node.minimax_move = best_move
                 node.minimax_value = min_value
 
-            # Update beta and check pruning
             beta = min(beta, min_value)
             if alpha >= beta:
-                break  # Alpha cutoff
+                break
 
         return min_value
 
