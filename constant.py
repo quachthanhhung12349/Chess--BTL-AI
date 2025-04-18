@@ -4,6 +4,8 @@ HEIGHT = 800
 WIDTH_BOARD = 800
 HEIGHT_BOARD = 800
 
+FPS = 60
+
 ROWS = 8
 COLS = 8
 SQUARE_SIZE = WIDTH_BOARD // COLS
@@ -22,3 +24,8 @@ PIECE_TEXTURE = {
     'Q': 'white_queen.png',
     'K': 'white_king.png'
 }
+
+MAIN_MENU = "manin_menu"
+MAIN_MENU_WITH_BUTTONS = "main_menu_with_buttons"
+PVP_MODE = "pvp_mode"
+PVE_MODE = "pve_mode"

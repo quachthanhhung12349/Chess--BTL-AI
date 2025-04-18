@@ -13,7 +13,13 @@ def chess_square_to_position(square):
 def position_to_chess_square(row, col):
     return chess.square(col, 7 - row) #Convert to square index (flip back
 
-def draw_board(screen, board, font):
+def draw_background(screen):
+    background_img = pygame.image.load('assets/startIMG.png')
+    background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
+    screen.blit(background_img, (0, 0))
+
+def draw_board(screen, board):
+    screen.fill((0, 0, 0))
     for row in range(ROWS):
         for col in range(COLS):
             rect = pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
@@ -52,3 +58,96 @@ def load_piece_texture():
         piece_img = pygame.image.load(f'assets/chess_image/{texture_path}').convert_alpha()
         piece_imgs[symbol] = piece_img
     return piece_imgs
+
+class GameMenu():
+    def __init__(self):
+        self.blinking_text = BlinkingText("Click to start game", (WIDTH // 2, HEIGHT // 2 + 20), text_color='black', blinking_interval=500)
+        
+        self.buttons = []
+        self.create_buttons()
+
+        self.overlay_alpha = 0
+        self.overlay_max_alpha = 180
+
+    def create_buttons(self):
+        labels = ["PvP", "PvE", "AI Matching"]
+        for i, text in enumerate(labels):
+            x = WIDTH // 2 - 150
+            y = 250 + i * 120
+            button = Button(x, y, 300, 70, text, "gray")
+            self.buttons.append(button)
+    
+    def show_blinking_text(self, surface):
+        self.blinking_text.show_blinking_text(surface)
+
+    def blink_the_text(self, dt):
+        self.blinking_text.update(dt)
+    
+    def is_blinking_text_clicked(self, event):
+        return self.blinking_text.is_clicked(event)
+
+    def display_choice_overlay(self, surface):
+        if self.overlay_alpha < self.overlay_max_alpha:
+            self.overlay_alpha += 10
+            self.overlay_alpha = min(self.overlay_alpha, self.overlay_max_alpha)
+
+        overlay = pygame.Surface((840, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((30,30,30, self.overlay_alpha))
+        surface.blit(overlay, (WIDTH // 2 - 380, 0))
+
+        for button in self.buttons:
+            button.show_button(surface)
+        
+    def handle_button_click(self, event):
+        for i, button in enumerate(self.buttons):
+            if button.is_clicked(event):
+                pass
+
+class Button():
+    def __init__(self, button_pos_x, button_pos_y, button_width, button_height, button_text, button_color):
+        self.font = pygame.font.SysFont('comicsans', 30)
+        self.rect = pygame.Rect(button_pos_x, button_pos_y, button_width, button_height)
+        self.button_text = button_text
+        self.button_text_color = "black"
+        self.button_color = button_color
+
+    def show_button(self, screen):
+        pygame.draw.rect(screen, self.button_color, self.rect, border_radius=10)
+        button_text_surface = self.font.render(self.button_text, True, self.button_text_color)
+        button_text_rect = button_text_surface.get_rect(center=self.rect.center)
+        screen.blit(button_text_surface, button_text_rect)
+
+    def is_clicked(self, event):
+        return event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(pygame.mouse.get_pos())
+
+class BlinkingText():
+    def __init__(self, text, pos, text_color='black', blinking_interval=500):
+        self.text = text
+        self.font = pygame.font.SysFont('comicsans', 30)
+        self.pos = pos
+        self.text_color = text_color
+
+        self.text_timer = 0
+        self.blinking_interval = blinking_interval
+        self.visible = True
+
+    def get_text_surface(self, text, text_color):
+        return self.font.render(text, True, text_color)
+    
+    def get_text_surface_rect(self, text_surface, pos):
+        return text_surface.get_rect(center=pos)
+
+    def update(self, dt):
+        self.text_timer += dt
+        if self.text_timer >= self.blinking_interval:
+            self.visible = not self.visible
+            self.text_timer = 0
+    
+    def show_blinking_text(self, surface):
+        if self.visible:
+            text_surface = self.get_text_surface(self.text, self.text_color)
+            text_surface_rect = self.get_text_surface_rect(text_surface, self.pos)
+            surface.blit(text_surface, text_surface_rect)
+
+    def is_clicked(self, event):
+        return event.type == pygame.MOUSEBUTTONDOWN and self.get_text_surface_rect(self.get_text_surface(self.text, self.text_color), self.pos).collidepoint(pygame.mouse.get_pos())
