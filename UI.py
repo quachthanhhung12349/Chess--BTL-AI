@@ -101,7 +101,12 @@ class GameMenu():
     def handle_button_click(self, event):
         for i, button in enumerate(self.buttons):
             if button.is_clicked(event):
-                pass
+                if i == 0:
+                    return PVP_MODE
+                elif i == 1:
+                    return PVE_MODE
+                elif i == 2:
+                    return AI_MATCHING_MODE
 
 class Button():
     def __init__(self, button_pos_x, button_pos_y, button_width, button_height, button_text, button_color):

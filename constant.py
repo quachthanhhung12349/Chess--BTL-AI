@@ -27,5 +27,7 @@ PIECE_TEXTURE = {
 
 MAIN_MENU = "manin_menu"
 MAIN_MENU_WITH_BUTTONS = "main_menu_with_buttons"
+GAME_MODE = "game_mode"
 PVP_MODE = "pvp_mode"
 PVE_MODE = "pve_mode"
+AI_MATCHING_MODE = "ai_matching_mode"
