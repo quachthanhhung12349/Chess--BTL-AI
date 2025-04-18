@@ -1,46 +1,30 @@
-import chess
-import random
-import time
+from LogicChess import ChessGame
 
-from board_tree import find_best_move, BoardTreeNode
-from evaluation_basic import count_material
+def main():
+    #Khởi tạo đối tượng ChessGame.
+    game = ChessGame()
 
+    #Vòng lặp game chính
+    while not game.is_game_over():
+        # Hiển thị bàn cờ
+        print("\nBàn cờ hiện tại:")
+        print(game.get_board())
 
-def game_end(chessboard):
-    if chessboard.is_checkmate():
-        return True
-    if chessboard.is_insufficient_material():
-        return True
-    if chessboard.is_stalemate():
-        return True
-    if chessboard.can_claim_threefold_repetition():
-        return True
-    return False
+        # Hiển thị nước đi hợp lệ
+        legal_moves = game.get_legal_moves()
+        print("\nCác nước đi hợp lệ:", legal_moves)
 
+        # Nhập nước đi
+        move_input = input("Nhập nước đi (UCI format, ví dụ 'e2e4'): ")
 
-board = chess.Board()
+        if move_input in legal_moves:
+            game.push_move(move_input)
+        else:
+            print("⚠ Nước đi không hợp lệ. Vui lòng nhập lại!")
 
-legal_moves = []
-while not game_end(board):
-    best_move = find_best_move(BoardTreeNode(board, True, 0, None), 3)
+    # Kết thúc trò chơi
+    print("\n🏁 Trò chơi kết thúc!")
+    print("Kết quả:", game.get_game_result())
 
-    print(best_move)
-    board.push_san(str(best_move))
-    print(board)
-    print("")
-
-    legal_moves = list(board.legal_moves)
-    board.push_san(str(random.choice(legal_moves)))
-    print(board)
-    print("")
-
-
-print(board.outcome())
-
-print(count_material(board))
-
-
-
-
-
-
+if __name__ == "__main__":
+    main()
