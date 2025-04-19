@@ -42,6 +42,49 @@ class Game:
                 draw_legal_moves(surface, self.legal_targets)
         pygame.display.update()
 
+    def handle_player_click(self, event):
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return
+
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        row = mouse_y // SQUARE_SIZE
+        col = mouse_x // SQUARE_SIZE
+
+        if not (0 <= row < 8 and 0 <= col < 8):
+            return  # Click ra ngoài bàn cờ
+
+        square = position_to_chess_square(row, col)
+        square_uci = chess.square_name(square)
+
+        if self.selected_square is None:
+            selected_piece = self.board.piece_at(square)
+            if selected_piece and selected_piece.color == self.board.turn:
+                self.selected_square = (row, col)
+                legal_moves = self.game.get_legal_moves()
+                self.legal_targets = [
+                    chess_square_to_position(chess.Move.from_uci(m).to_square)
+                    for m in legal_moves
+                    if m.startswith(square_uci)
+                ]
+        else:
+            initial_square = chess.square_name(position_to_chess_square(*self.selected_square))
+            final_square = square_uci
+            move_uci = initial_square + final_square
+
+            from_sq = chess.parse_square(initial_square)
+            to_sq = chess.parse_square(final_square)
+            piece = self.board.piece_at(from_sq)
+
+            if piece and piece.piece_type == chess.PAWN and chess.square_rank(to_sq) in [0, 7]:
+                move_uci += "q"  # Phong hậu
+
+            if move_uci in self.game.get_legal_moves():
+                self.game.push_move(move_uci)
+                self.board = self.game.get_board()
+
+            self.selected_square = None
+            self.legal_targets = []
+
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -61,84 +104,20 @@ class Game:
                     self.game_state = GAME_MODE
                     self.game_mode = AI_MATCHING_MODE
             elif self.game_state == GAME_MODE:
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            self.game_state = MAIN_MENU_WITH_BUTTONS
-                            self.game_mode = None
-                            self.selected_square = None
-                            self.legal_targets = []
-                            self.game.reset_game()
-                    if self.game_mode == PVP_MODE:
-                        if event.type == pygame.MOUSEBUTTONDOWN:
-                            mouse_x, mouse_y = pygame.mouse.get_pos()
-                            row = mouse_y // SQUARE_SIZE
-                            col = mouse_x // SQUARE_SIZE
-                            square = position_to_chess_square(row, col)
-                            square_uci = chess.square_name(square)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.game_state = MAIN_MENU_WITH_BUTTONS
+                        self.game_mode = None
+                        self.selected_square = None
+                        self.legal_targets = []
+                        self.game.reset_game()
 
-                            if self.selected_square is None:
-                                selected_piece = self.board.piece_at(square)
-                                if selected_piece and selected_piece.color == self.board.turn:
-                                    self.selected_square = (row, col)
-                                    legal_moves = self.game.get_legal_moves()
-                                    self.legal_targets = [
-                                        chess_square_to_position(chess.Move.from_uci(m).to_square)
-                                        for m in legal_moves
-                                        if m.startswith(square_uci)
-                                    ]
-                            else:
-                                initial_square = chess.square_name(position_to_chess_square(*self.selected_square))
-                                final_square = square_uci
-                                move_uci = initial_square + final_square
+                if self.game_mode == PVP_MODE:
+                    self.handle_player_click(event)
 
-                                from_sq = chess.parse_square(initial_square)
-                                to_sq = chess.parse_square(final_square)
-                                piece = self.board.piece_at(from_sq)
-
-                                if piece and piece.piece_type == chess.PAWN and chess.square_rank(to_sq) in [0, 7]:
-                                    move_uci += "q"
-
-                                if move_uci in self.game.get_legal_moves():
-                                    self.game.push_move(move_uci)
-                                    self.board = self.game.get_board()
-                                self.selected_square = None
-                                self.legal_targets = []
-                    elif self.game_mode == PVE_MODE:
-                        if self.board.turn == chess.WHITE:  # Người chơi là trắng
-                            if event.type == pygame.MOUSEBUTTONDOWN:
-                                mouse_x, mouse_y = pygame.mouse.get_pos()
-                                row = mouse_y // SQUARE_SIZE
-                                col = mouse_x // SQUARE_SIZE
-                                square = position_to_chess_square(row, col)
-                                square_uci = chess.square_name(square)
-
-                                if self.selected_square is None:
-                                    selected_piece = self.board.piece_at(square)
-                                    if selected_piece and selected_piece.color == self.board.turn:
-                                        self.selected_square = (row, col)
-                                        legal_moves = self.game.get_legal_moves()
-                                        self.legal_targets = [
-                                            chess_square_to_position(chess.Move.from_uci(m).to_square)
-                                            for m in legal_moves
-                                            if m.startswith(square_uci)
-                                        ]
-                                else:
-                                    initial_square = chess.square_name(position_to_chess_square(*self.selected_square))
-                                    final_square = square_uci
-                                    move_uci = initial_square + final_square
-
-                                    from_sq = chess.parse_square(initial_square)
-                                    to_sq = chess.parse_square(final_square)
-                                    piece = self.board.piece_at(from_sq)
-
-                                    if piece and piece.piece_type == chess.PAWN and chess.square_rank(to_sq) in [0, 7]:
-                                        move_uci += "q"
-
-                                    if move_uci in self.game.get_legal_moves():
-                                        self.game.push_move(move_uci)
-                                        self.board = self.game.get_board()
-                                    self.selected_square = None
-                                    self.legal_targets = []
+                elif self.game_mode == PVE_MODE:
+                    if self.board.turn == chess.WHITE:
+                        self.handle_player_click(event)
 
     def update(self, dt):
         if self.game_state == MAIN_MENU:
