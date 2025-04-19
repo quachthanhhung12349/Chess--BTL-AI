@@ -6,6 +6,14 @@ from constant import *
 class Game:
     def __init__(self):
         pygame.init()
+
+        self.click_sound = pygame.mixer.Sound('assets/mouseClick.wav')
+        pygame.mixer.music.load('assets/chess_music.mp3')
+        pygame.mixer.music.play(-1)
+        volume = 0.5
+        pygame.mixer.music.set_volume(volume)
+        self.mouse_clicked = False
+
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Chess Game")
         self.clock = pygame.time.Clock()
@@ -87,9 +95,15 @@ class Game:
 
     def handle_events(self):
         for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.mouse_clicked = True
+                self.click_sound.play()
+
             if event.type == pygame.QUIT:
                 self.running = False
             if self.game_state == MAIN_MENU:
+
+                self.game_menu.handle_settings_click(event)
                 if self.game_menu.is_blinking_text_clicked(event):
                     self.game_state = MAIN_MENU_WITH_BUTTONS
             elif self.game_state == MAIN_MENU_WITH_BUTTONS:
@@ -103,6 +117,9 @@ class Game:
                 elif selected_mode == AI_MATCHING_MODE:
                     self.game_state = GAME_MODE
                     self.game_mode = AI_MATCHING_MODE
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.game_state = MAIN_MENU
             elif self.game_state == GAME_MODE:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:

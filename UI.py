@@ -3,6 +3,8 @@ import pygame
 import os
 import chess
 from constant import *
+import tkinter as tk
+from tkinter import filedialog
 
 
 def chess_square_to_position(square):
@@ -62,9 +64,13 @@ def load_piece_texture():
 class GameMenu():
     def __init__(self):
         self.blinking_text = BlinkingText("Click to start game", (WIDTH // 2, HEIGHT // 2 + 20), text_color='black', blinking_interval=500)
-        
+
+        self.current_volume = 0.5
+
         self.buttons = []
         self.create_buttons()
+        self.settings_button = Button(WIDTH - 140, 20, 135, 40, "Settings", "gray")
+        self.settings_popup_visible = False
 
         self.overlay_alpha = 0
         self.overlay_max_alpha = 180
@@ -79,6 +85,11 @@ class GameMenu():
     
     def show_blinking_text(self, surface):
         self.blinking_text.show_blinking_text(surface)
+
+        self.settings_button.show_button(surface)
+        if self.settings_popup_visible:
+            self.display_settings_popup(surface)
+
 
     def blink_the_text(self, dt):
         self.blinking_text.update(dt)
@@ -97,7 +108,81 @@ class GameMenu():
 
         for button in self.buttons:
             button.show_button(surface)
-        
+
+    def display_settings_popup(self, surface):
+        popup_width = 300
+        popup_height = 200
+        self.popup_rect = pygame.Rect((WIDTH - popup_width) // 2, (HEIGHT - popup_height) // 2, popup_width,
+                                      popup_height)
+        pygame.draw.rect(surface, (200, 200, 200), self.popup_rect, border_radius=10)
+        pygame.draw.rect(surface, (100, 100, 100), self.popup_rect, 4, border_radius=10)
+
+        font = pygame.font.SysFont('comicsans', 28)
+        text_surface = font.render("Settings", True, (0, 0, 0))
+        text_rect = text_surface.get_rect(center=(self.popup_rect.centerx, self.popup_rect.top + 40))
+        surface.blit(text_surface, text_rect)
+
+        # Nút X đỏ
+        self.close_button_rect = pygame.Rect(self.popup_rect.right - 40, self.popup_rect.top + 10, 30, 30)
+        pygame.draw.rect(surface, (255, 0, 0), self.close_button_rect, border_radius=5)
+
+        x_font = pygame.font.SysFont('comicsans', 24, bold=True)
+        x_surface = x_font.render("X", True, (255, 255, 255))
+        x_rect = x_surface.get_rect(center=self.close_button_rect.center)
+        surface.blit(x_surface, x_rect)
+
+        #loa icon
+        speaker_icon = pygame.image.load('assets/speaker_icon.png')
+        speaker_icon = pygame.transform.scale(speaker_icon, (30, 30))
+        surface.blit(speaker_icon, (self.popup_rect.left + 20, self.popup_rect.top + 80))
+
+        # âm lượng
+        self.slider_rect = pygame.Rect(self.popup_rect.left + 60, self.popup_rect.top + 90, 200, 10)
+        pygame.draw.rect(surface, (150, 150, 150), self.slider_rect)
+        # chấm tròn thể hiện mức âm lượng hiện tại
+        volume_dot_x = self.slider_rect.left + int(self.current_volume * self.slider_rect.width)
+        pygame.draw.circle(surface, (0, 0, 0), (volume_dot_x, self.slider_rect.centery), 8)
+
+        # chọn file nhạc
+        self.choose_music_button = pygame.Rect(self.popup_rect.centerx - 70, self.popup_rect.top + 130, 140, 30)
+        pygame.draw.rect(surface, (100, 100, 255), self.choose_music_button, border_radius=5)
+        choose_music_font = pygame.font.SysFont('comicsans', 20)
+        music_text = choose_music_font.render("Choose Music", True, (255, 255, 255))
+        music_rect = music_text.get_rect(center=self.choose_music_button.center)
+        surface.blit(music_text, music_rect)
+
+    def handle_settings_click(self, event):
+        if self.settings_button.is_clicked(event):
+            self.settings_popup_visible = not self.settings_popup_visible
+        elif self.settings_popup_visible:
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Đóng popup
+            if hasattr(self, "close_button_rect") and self.close_button_rect.collidepoint(mouse_pos):
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    self.settings_popup_visible = False
+
+            # Điều chỉnh âm lượng khi click vào thanh trượt
+            if hasattr(self, "slider_rect") and self.slider_rect.collidepoint(mouse_pos):
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    relative_x = mouse_pos[0] - self.slider_rect.left
+                    self.current_volume = max(0, min(1, relative_x / self.slider_rect.width))
+                    pygame.mixer.music.set_volume(self.current_volume)
+
+            # Chọn file nhạc từ máy
+            if hasattr(self, "choose_music_button") and self.choose_music_button.collidepoint(mouse_pos):
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    root = tk.Tk()
+                    root.withdraw()
+                    file_path = filedialog.askopenfilename(filetypes=[("MP3 files", "*.mp3")])
+                    if file_path:
+                        try:
+                            pygame.mixer.music.load(file_path)
+                            pygame.mixer.music.play(-1)
+                            pygame.mixer.music.set_volume(self.current_volume)
+                        except Exception as e:
+                            print("Lỗi tải nhạc:", e)
+
     def handle_button_click(self, event):
         for i, button in enumerate(self.buttons):
             if button.is_clicked(event):
@@ -114,16 +199,38 @@ class Button():
         self.rect = pygame.Rect(button_pos_x, button_pos_y, button_width, button_height)
         self.button_text = button_text
         self.button_text_color = "black"
-        self.button_color = button_color
+        self.default_color = button_color
+        self.hover_color = self.get_hover_color(button_color)
+
+    def get_hover_color(self, color_name):
+        color_map = {
+            "gray": (160, 160, 160),
+            "red": (255, 100, 100),
+            "green": (100, 255, 100),
+            "blue": (100, 100, 255),
+            # fallback nếu không match tên
+            "default": (200, 200, 200)
+        }
+        return color_map.get(color_name, color_map["default"])
 
     def show_button(self, screen):
-        pygame.draw.rect(screen, self.button_color, self.rect, border_radius=10)
+        current_color = self.hover_color if self.is_hovered() else self.default_color
+        if isinstance(current_color, str):
+            draw_color = pygame.Color(current_color)
+        else:
+            draw_color = current_color
+
+        pygame.draw.rect(screen, draw_color, self.rect, border_radius=10)
         button_text_surface = self.font.render(self.button_text, True, self.button_text_color)
         button_text_rect = button_text_surface.get_rect(center=self.rect.center)
         screen.blit(button_text_surface, button_text_rect)
 
+    def is_hovered(self):
+        return self.rect.collidepoint(pygame.mouse.get_pos())
+
     def is_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(pygame.mouse.get_pos())
+
 
 class BlinkingText():
     def __init__(self, text, pos, text_color='black', blinking_interval=500):
