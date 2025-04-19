@@ -2,7 +2,11 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+<<<<<<< HEAD
       <module fileurl="file://$PROJECT_DIR$/.idea/ChessAI.iml" filepath="$PROJECT_DIR$/.idea/ChessAI.iml" />
+=======
+      <module fileurl="file://$PROJECT_DIR$/.idea/Chess--BTL-AI.iml" filepath="$PROJECT_DIR$/.idea/Chess--BTL-AI.iml" />
+>>>>>>> 34a1a9e0017b649147650e396d85f6411bfc5399
     </modules>
   </component>
 </project>
