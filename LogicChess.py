@@ -3,8 +3,6 @@ import chess
 #Notes: FEN là định dạng tiêu chuẩn  để mô tả một vị trí cụ thể trên bàn cờ vua.
 Nó là một chuỗi ASCII duy nhất chứa tất cả thông tin cần thiết để tái tạo một thế cờ.
 """
-<<<<<<< HEAD
-=======
 def minimax(board, depth, alpha, beta, is_maximizing):
         if depth == 0 or board.is_game_over():
             return evaluate_board(board), None
@@ -87,9 +85,6 @@ def evaluate_board(board):
 
     return value if board.turn == chess.WHITE else -value
 
-
-    
->>>>>>> 34a1a9e0017b649147650e396d85f6411bfc5399
 class ChessGame:
     """
     Lớp chứa logic của trò chơi cờ vua.
@@ -131,26 +126,17 @@ class ChessGame:
             move = chess.Move.from_uci(move_uci)
 
             if move in self.board.legal_moves:
-<<<<<<< HEAD
-=======
                 piece = self.board.piece_at(move.from_square)
->>>>>>> 34a1a9e0017b649147650e396d85f6411bfc5399
                 """
                 Kiểm tra phong hậu (nếu tốt đi đến hàng cuối mà chưa có ký hiệu phong quân,
                 mặc định chọn hậu
                 """
-<<<<<<< HEAD
-                if self.board.piece_at(move.from_square).piece_type == chess.PAWN and (
-                        chess.square_rank(move.to_square) in [0, 7]):
-                    move.promotion = chess.QUEEN  # Mặc định phong hậu nếu không có chỉ định
-=======
                 # if self.board.piece_at(move.from_square).piece_type == chess.PAWN and (
                 #         chess.square_rank(move.to_square) in [0, 7]):
                 #     move.promotion = chess.QUEEN  # Mặc định phong hậu nếu không có chỉ định
                 if piece and piece.piece_type == chess.PAWN:
                     if chess.square_rank(move.to_square) in [0, 7] and move.promotion is None:
                         move = chess.Move(move.from_square, move.to_square, promotion=chess.QUEEN)
->>>>>>> 34a1a9e0017b649147650e396d85f6411bfc5399
                 self.board.push(move)
                 return True
             else:
@@ -169,12 +155,4 @@ class ChessGame:
 
     def reset_game(self):
         """Thiết lập lại bàn cờ để bắt đầu ván mới."""
-<<<<<<< HEAD
         self.board.reset()
-=======
-        self.board.reset()
-
-    
-
-
->>>>>>> 34a1a9e0017b649147650e396d85f6411bfc5399

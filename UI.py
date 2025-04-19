@@ -1,6 +1,4 @@
-<<<<<<< HEAD
-#UI UX controller
-=======
+
 #UI UX controller
 import pygame
 import os
@@ -159,4 +157,3 @@ class BlinkingText():
 
     def is_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and self.get_text_surface_rect(self.get_text_surface(self.text, self.text_color), self.pos).collidepoint(pygame.mouse.get_pos())
->>>>>>> 34a1a9e0017b649147650e396d85f6411bfc5399
