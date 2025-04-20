@@ -33,11 +33,14 @@ class Game:
         self.gamemode_buttons = []
         self.create_gamemode_buttons()
 
-        self.player1_time = 30
-        self.player2_time = 30
+        self.player1_time = 0
+        self.player2_time = 0
         self.current_player = chess.WHITE
         self.font = pygame.font.SysFont('comicsans', 30)
         self.game_start_time = 0
+
+        self.resign_white_button = Button(WIDTH-132, HEIGHT - 120, 120, 40, "Resign", "lightcoral")
+        self.resign_black_button = Button(12, 80, 120, 40, "Resign", "lightcoral")
 
         self.game_over = False
         self.game_result_text = ""
@@ -66,7 +69,7 @@ class Game:
         button_height = 50
         start_x = WIDTH // 2 - button_width // 2
         start_y = HEIGHT // 2 - (button_height * 3 // 2 + 20)
-        button_texts = ["Blitz", "Rapid", "Standard"]
+        button_texts = ["Blitz", "Rapid", "Standard","No Timer"]
         self.gamemode_buttons = [
             Button(start_x, start_y + i * (button_height + 10), button_width, button_height, text, "lightgray")
             for i, text in enumerate(button_texts)
@@ -79,16 +82,16 @@ class Game:
         self.game_start_time = pygame.time.get_ticks()
 
     def update_timer(self, dt):
-        if self.game_mode in [PVP_MODE, PVE_MODE] and not self.game.is_game_over():
+        if self.game_mode in [PVP_MODE, PVE_MODE] and self.game_mode != "NO_TIMER" and not self.game.is_game_over():
             time_elapsed = dt / 1000.0  # Chuyển đổi milliseconds sang giây
             if self.current_player == chess.WHITE:
                 self.player1_time -= time_elapsed
                 if self.player1_time < 0:
-                    self.game.declare_winner(chess.BLACK) # Hết thời gian, người chơi đen thắng
+                    self.game.declare_winner(chess.BLACK) # đen thắng
             else:
                 self.player2_time -= time_elapsed
                 if self.player2_time < 0:
-                    self.game.declare_winner(chess.WHITE) # Hết thời gian, người chơi trắng thắng
+                    self.game.declare_winner(chess.WHITE) #trắng thắng
 
     def format_time(self, seconds):
         if seconds < 0:
@@ -123,6 +126,8 @@ class Game:
                 legal_targets_on_board = [(r, c) for r, c in self.legal_targets]
                 draw_legal_moves(surface.subsurface((board_x, board_y, BOARD_SIZE, BOARD_SIZE)), legal_targets_on_board)
             self.draw_timer(surface)
+            self.resign_white_button.show_button(surface)
+            self.resign_black_button.show_button(surface)
         elif self.game_state == GAME_MODE_MENU:
             draw_background(surface)
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -179,7 +184,7 @@ class Game:
 
             if self.selected_square is None:
                 selected_piece = self.board.piece_at(square)
-                if selected_piece and selected_piece.color == self.board.turn:
+                if selected_piece and selected_piece.color == self.board.turn and self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]: # Thêm "NO_TIMER" vào đây
                     self.selected_square = (row, col)
                     legal_moves = self.game.get_legal_moves()
                     self.legal_targets = [
@@ -199,7 +204,7 @@ class Game:
                 if piece and piece.piece_type == chess.PAWN and chess.square_rank(to_sq) in [0, 7]:
                     move_uci += "q"  # Phong hậu
 
-                if move_uci in self.game.get_legal_moves():
+                if move_uci in self.game.get_legal_moves() and self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]:
                     self.game.push_move(move_uci)
                     self.board = self.game.get_board()
                     if self.current_player == chess.WHITE:
@@ -207,13 +212,12 @@ class Game:
                     else:
                         self.player2_time += self.increment
                     self.current_player = not self.current_player
-                    self.current_player = not self.current_player # Chuyển lượt
                     self.selected_square = None
                     self.legal_targets = []
                 else:
                     # Nếu click vào một ô khác khi đang chọn quân, bỏ chọn hoặc chọn quân mới
                     selected_piece = self.board.piece_at(square)
-                    if selected_piece and selected_piece.color == self.board.turn:
+                    if selected_piece and selected_piece.color == self.board.turn and self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]:
                         self.selected_square = (row, col)
                         legal_moves = self.game.get_legal_moves()
                         self.legal_targets = [
@@ -246,6 +250,9 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         self.game_state = MAIN_MENU
             elif self.game_state == GAME_MODE_MENU:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.game_state = MAIN_MENU_WITH_BUTTONS
                 for button in self.gamemode_buttons:
                     if button.is_clicked(event):
                         if button.button_text == "Blitz":
@@ -254,6 +261,10 @@ class Game:
                             self.base_time = 600  # 10p
                         elif button.button_text == "Standard":
                             self.base_time = 1800  # 30p
+                        elif button.button_text == "No Timer":
+                            self.game_mode = "NO_TIMER"
+                            self.game_state = GAME_MODE
+                            break
                         self.reset_timer()
                         self.game_state = GAME_MODE
                         break
@@ -266,7 +277,14 @@ class Game:
                         self.legal_targets = []
                         self.game.reset_game()
 
-                if self.game_mode in [PVP_MODE, PVE_MODE]:
+                if self.resign_white_button.is_clicked(event) :
+                    self.game.declare_winner(chess.BLACK)
+                    self.handle_game_over()
+                elif self.resign_black_button.is_clicked(event) :
+                    self.game.declare_winner(chess.WHITE)
+                    self.handle_game_over()
+
+                if self.game_mode in [PVP_MODE, PVE_MODE,"NO_TIMER"]:
                     self.handle_player_click(event)
 
                 elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
@@ -310,9 +328,10 @@ class Game:
         if self.game_state == MAIN_MENU:
             self.game_menu.blink_the_text(dt)
         elif self.game_state == GAME_MODE:
-            self.update_timer(dt)
-            if self.game.is_game_over() and not self.game_over:
-                self.handle_game_over()
+            if self.game_mode != "NO_TIMER":
+                self.update_timer(dt)
+                if self.game.is_game_over() and not self.game_over:
+                    self.handle_game_over()
 
 if __name__ == "__main__":
     game = Game()
