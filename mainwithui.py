@@ -27,6 +27,7 @@ class Game:
         self.running = True
         self.selected_square = None
         self.legal_targets = []
+        self.move_history = []
 
     def run(self):
         while self.running:
@@ -48,6 +49,7 @@ class Game:
                 draw_selected_square(surface, self.selected_square)
             if self.legal_targets:
                 draw_legal_moves(surface, self.legal_targets)
+            draw_move_history(surface, self.move_history)
         pygame.display.update()
 
     def handle_player_click(self, event):
@@ -89,6 +91,7 @@ class Game:
             if move_uci in self.game.get_legal_moves():
                 self.game.push_move(move_uci)
                 self.board = self.game.get_board()
+                self.move_history.append(self.board.peek().uci()) ## Lưu lịch sử nước đi
 
             self.selected_square = None
             self.legal_targets = []
@@ -120,6 +123,7 @@ class Game:
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.game_state = MAIN_MENU
+                        
             elif self.game_state == GAME_MODE:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -128,6 +132,7 @@ class Game:
                         self.selected_square = None
                         self.legal_targets = []
                         self.game.reset_game()
+                        self.move_history.clear()
 
                 if self.game_mode == PVP_MODE:
                     self.handle_player_click(event)
@@ -146,6 +151,7 @@ class Game:
                 import random
                 move = random.choice(legal_moves)
                 self.board.push(move)
+                self.move_history.append(self.board.peek().uci())
         #     """AI minimax"""
         #     _, best_move = minimax(self.board, depth=3, alpha=float('-inf'), beta=float('inf'), is_maximizing=True)
         #     if best_move:

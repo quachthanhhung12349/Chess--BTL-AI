@@ -54,6 +54,35 @@ def draw_legal_moves(screen, legal_moves):
         rect = pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
         pygame.draw.rect(screen, color, rect)
 
+def draw_move_history(screen, move_history):
+    font = pygame.font.SysFont('comicsans', 30)
+    pygame.draw.rect(screen, (245, 245, 245), (WIDTH_BOARD + 5, WIDTH // 2 - 200, WIDTH - WIDTH_BOARD, WIDTH // 2))
+    pygame.draw.rect(screen, (0, 0, 0), (WIDTH_BOARD + 5, WIDTH // 2 - 200, WIDTH - WIDTH_BOARD, WIDTH // 2), 2)
+    max_moves_display = WIDTH // 2 // 20
+    start_index = max(0, len(move_history) - max_moves_display)
+    temp_board = chess.Board()
+    move_display_count = 0
+    for i, move in enumerate(move_history[start_index:]): 
+        if move_display_count >= 10:
+            pygame.draw.rect(screen, (245, 245, 245), (WIDTH_BOARD + 5, WIDTH // 2 - 200, WIDTH - WIDTH_BOARD, WIDTH // 2))
+            pygame.draw.rect(screen, (0, 0, 0), (WIDTH_BOARD + 5, WIDTH // 2 - 200, WIDTH - WIDTH_BOARD, WIDTH // 2), 2)
+            move_display_count = 0
+        
+        move = chess.Move.from_uci(move)
+        move_str = None
+        if move in temp_board.legal_moves:
+            # Xử lý ăn quân nếu có
+            target_piece = temp_board.piece_at(move.to_square)
+            if target_piece:  # Có quân bị ăn
+                move_str = f"{temp_board.san(move)}"  # Giữ nguyên kiểu PGN
+            else:
+                move_str = temp_board.san(move)  # Nếu không ăn quân, hiển thị bình thường
+        move_text = font.render(move_str, True, (0, 0, 0))
+        screen.blit(move_text, (WIDTH_BOARD + 10, WIDTH // 2 - 200 + move_display_count * 40))
+        # temp_board.push(move) if temp_board.is_legal(move) else print("exception") # Cập nhật bàn cờ tạm thời    
+        move_display_count += 1
+                      
+ 
 def load_piece_texture():
     piece_imgs = {}
     for symbol, texture_path in PIECE_TEXTURE.items():

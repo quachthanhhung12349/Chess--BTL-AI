@@ -1,3 +1,5 @@
+import chess
+
 WIDTH = 1100
 HEIGHT = 800
 
@@ -24,6 +26,15 @@ PIECE_TEXTURE = {
     'Q': 'white_queen.png',
     'K': 'white_king.png'
 }
+
+piece_names = {
+            chess.PAWN: "Pawn",
+            chess.KNIGHT: "Knight",
+            chess.BISHOP: "Bishop",
+            chess.ROOK: "Rook",
+            chess.QUEEN: "Queen",
+            chess.KING: "King",
+        }
 
 MAIN_MENU = "manin_menu"
 MAIN_MENU_WITH_BUTTONS = "main_menu_with_buttons"
