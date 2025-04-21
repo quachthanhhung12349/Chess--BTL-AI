@@ -1,7 +1,7 @@
 import chess
 import time
 
-from evaluation_basic import count_material
+from evaluation_basic import evaluate
 
 MAX_DEPTH = 4
 
@@ -12,7 +12,7 @@ class BoardTreeNode:
         self.children = []
         self.board = board
         self.color = color
-        self.evaluation = count_material(board)  # Assume count_material is defined
+        self.evaluation = evaluate(board)  # Assume count_material is defined
         self.depth = depth
         self.minimax_move = None
         self.move = move

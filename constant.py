@@ -1,3 +1,5 @@
+import chess
+
 WIDTH = 1100
 HEIGHT = 800
 
@@ -23,6 +25,20 @@ PIECE_TEXTURE = {
     'B': 'white_bishop.png',
     'Q': 'white_queen.png',
     'K': 'white_king.png'
+}
+
+# Các ô trung tâm (d4, d5, e4, e5)
+CENTER_SQUARES = {
+    chess.D4, chess.D5,
+    chess.E4, chess.E5
+}
+
+# Các ô mở rộng trung tâm (c3, c4, c5, c6, d3, d6, e3, e6, f3, f4, f5, f6)
+EXTENDED_CENTER = {
+    chess.C3, chess.C4, chess.C5, chess.C6,
+    chess.D3, chess.D6,
+    chess.E3, chess.E6,
+    chess.F3, chess.F4, chess.F5, chess.F6
 }
 
 MAIN_MENU = "manin_menu"
