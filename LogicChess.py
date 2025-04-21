@@ -101,6 +101,7 @@ class ChessGame:
     def __init__(self):
         """Khởi tạo bàn cờ với trạng thái mặc định."""
         self.board = chess.Board()
+        self.game_over_status = None
 
     def get_board(self):
         """Trả về đối tượng bàn cờ hiện tại."""
@@ -149,16 +150,24 @@ class ChessGame:
 
     def is_game_over(self):
         """Kiểm tra tình trạng kết thúc trò chơi."""
-        return self.board.is_game_over()
+        return self.board.is_game_over() or self.game_over_status is not None
 
     def get_game_result(self):
         """Trả về kết quả ván cờ dưới dạng chuỗi, ví dụ: '1-0', '0-1', '1/2-1/2'."""
+        if self.game_over_status:
+            return self.game_over_status
         return self.board.result()
 
     def reset_game(self):
         """Thiết lập lại bàn cờ để bắt đầu ván mới."""
         self.board.reset()
+        self.game_over_status = None
 
+    def declare_winner(self, winner_color):
+        if winner_color == chess.WHITE:
+            self.game_over_status = "White wins"
+        elif winner_color == chess.BLACK:
+            self.game_over_status = "Black wins"
     
 
 
