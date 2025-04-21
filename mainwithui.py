@@ -207,21 +207,6 @@ class Game:
             self.draw(self.screen)
         pygame.quit()
 
-    def draw(self, surface):
-        draw_background(surface)
-        if self.game_state == MAIN_MENU:
-            self.game_menu.show_blinking_text(surface)
-        elif self.game_state == MAIN_MENU_WITH_BUTTONS:
-            self.game_menu.display_choice_overlay(surface)
-        elif self.game_state == GAME_MODE:
-            draw_board(surface, self.board)
-            if self.selected_square:
-                draw_selected_square(surface, self.selected_square)
-            if self.legal_targets:
-                draw_legal_moves(surface, self.legal_targets)
-            draw_move_history(surface, self.move_history)
-        pygame.display.update()
-
     def handle_player_click(self, event):
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
@@ -296,8 +281,7 @@ class Game:
                             for m in legal_moves
                             if m.startswith(square_uci)
                         ]
-                    else:                self.move_history.append(self.board.peek().uci()) ## Lưu lịch sử nước đi
-
+                    else:
                         self.selected_square = None
                         self.legal_targets = []
 
@@ -395,14 +379,6 @@ class Game:
                         self.legal_targets = []
                         self.game_over = False
                         self.game_result_text = ""
-                        self.move_history.clear()
-
-                if self.game_mode == PVP_MODE:
-                    self.handle_player_click(event)
-
-                elif self.game_mode == PVE_MODE:
-                    if self.board.turn == chess.WHITE:
-                        self.handle_player_click(event)
 
     def update(self, dt):
         if self.game_state == MAIN_MENU:
