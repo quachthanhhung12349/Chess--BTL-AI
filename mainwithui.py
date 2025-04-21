@@ -4,6 +4,7 @@ from LogicChess import ChessGame
 from UI import *
 from constant import *
 
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -39,7 +40,7 @@ class Game:
         self.font = pygame.font.SysFont('comicsans', 30)
         self.game_start_time = 0
 
-        self.resign_white_button = Button(WIDTH-132, HEIGHT - 120, 120, 40, "Resign", "lightcoral")
+        self.resign_white_button = Button(WIDTH - 132, HEIGHT - 120, 120, 40, "Resign", "lightcoral")
         self.resign_black_button = Button(12, 80, 120, 40, "Resign", "lightcoral")
 
         self.game_over = False
@@ -50,6 +51,9 @@ class Game:
 
         self.base_time = 0  # thời gian ban đầu theo chế độ
         self.increment = 3  # số giây cộng thêm sau mỗi nước đi
+
+        self.captured_pieces_white = []
+        self.captured_pieces_black = []
 
     def handle_game_over(self):
         self.game_over = True
@@ -69,7 +73,7 @@ class Game:
         button_height = 50
         start_x = WIDTH // 2 - button_width // 2
         start_y = HEIGHT // 2 - (button_height * 3 // 2 + 20)
-        button_texts = ["Blitz", "Rapid", "Standard","No Timer"]
+        button_texts = ["Blitz", "Rapid", "Standard", "No Timer"]
         self.gamemode_buttons = [
             Button(start_x, start_y + i * (button_height + 10), button_width, button_height, text, "lightgray")
             for i, text in enumerate(button_texts)
@@ -87,11 +91,11 @@ class Game:
             if self.current_player == chess.WHITE:
                 self.player1_time -= time_elapsed
                 if self.player1_time < 0:
-                    self.game.declare_winner(chess.BLACK) # đen thắng
+                    self.game.declare_winner(chess.BLACK)  # đen thắng
             else:
                 self.player2_time -= time_elapsed
                 if self.player2_time < 0:
-                    self.game.declare_winner(chess.WHITE) #trắng thắng
+                    self.game.declare_winner(chess.WHITE)  # trắng thắng
 
     def format_time(self, seconds):
         if seconds < 0:
@@ -106,6 +110,44 @@ class Game:
         surface.blit(timer1_text, (30, 30))
         surface.blit(timer2_text, (WIDTH - timer2_text.get_width() - 30, HEIGHT - timer2_text.get_height() - 30))
 
+    def draw_captured_pieces(self, surface):
+        captured_piece_size = SQUARE_SIZE // 2
+        padding = 5
+
+        # vẽ quân cờ đen bị ăn (bên trái)
+        start_x_black = (WIDTH - BOARD_SIZE) // 2 - captured_piece_size - padding
+        current_y_black = (HEIGHT - BOARD_SIZE) // 2 + 150
+        current_col_black = 0
+        for i, piece in enumerate(self.captured_pieces_black):
+            if i > 0 and current_y_black > HEIGHT - 400 :
+                current_y_black = (HEIGHT - BOARD_SIZE) // 2 + 150
+                current_col_black += 1
+                start_x_black -= 20  # vẽ ở cột tiếp theo
+
+            img = load_piece_texture().get(piece.symbol())
+            scaled_img = pygame.transform.scale(img, (captured_piece_size, captured_piece_size))
+            img_rect = scaled_img.get_rect(
+                topleft=(start_x_black - current_col_black * (captured_piece_size + padding), current_y_black))
+            surface.blit(scaled_img, img_rect)
+            current_y_black += captured_piece_size + padding
+
+        # vẽ quân cờ trắng bị ăn (bên phải)
+        start_x_white = (WIDTH + BOARD_SIZE) // 2 + padding
+        current_y_white = (HEIGHT - 200)
+        current_col_white = 0
+        for i, piece in enumerate(self.captured_pieces_white):
+            if i > 0 and current_y_white < 100:
+                current_y_white = (HEIGHT - 200)
+                current_col_white += 1
+                start_x_white += 20 # vẽ ở cột tiếp theo
+
+            img = load_piece_texture().get(piece.symbol())
+            scaled_img = pygame.transform.scale(img, (captured_piece_size, captured_piece_size))
+            img_rect = scaled_img.get_rect(
+                topleft=(start_x_white + current_col_white * (captured_piece_size + padding), current_y_white))
+            surface.blit(scaled_img, img_rect)
+            current_y_white -= captured_piece_size + padding
+
     def draw(self, surface):
         if self.game_state in [MAIN_MENU, MAIN_MENU_WITH_BUTTONS]:
             draw_background(surface)
@@ -114,20 +156,23 @@ class Game:
             elif self.game_state == MAIN_MENU_WITH_BUTTONS:
                 self.game_menu.display_choice_overlay(surface)
         elif self.game_state == GAME_MODE:
-            surface.fill((139, 69, 19)) # nâu đậm
+            surface.fill((139, 69, 19))  # nâu đậm
             # mid
             board_x = (WIDTH - BOARD_SIZE) // 2
             board_y = (HEIGHT - BOARD_SIZE) // 2
-            draw_board(surface.subsurface((board_x, board_y, BOARD_SIZE, BOARD_SIZE)), self.board)
+            board_surface = surface.subsurface((board_x, board_y, BOARD_SIZE, BOARD_SIZE))
+            draw_board(board_surface, self.board)
             if self.selected_square:
                 selected_row, selected_col = self.selected_square
-                draw_selected_square(surface.subsurface((board_x, board_y, BOARD_SIZE, BOARD_SIZE)), (selected_row, selected_col))
+                draw_selected_square(surface.subsurface((board_x, board_y, BOARD_SIZE, BOARD_SIZE)),
+                                     (selected_row, selected_col))
             if self.legal_targets:
                 legal_targets_on_board = [(r, c) for r, c in self.legal_targets]
                 draw_legal_moves(surface.subsurface((board_x, board_y, BOARD_SIZE, BOARD_SIZE)), legal_targets_on_board)
             self.draw_timer(surface)
             self.resign_white_button.show_button(surface)
             self.resign_black_button.show_button(surface)
+            self.draw_captured_pieces(surface)
         elif self.game_state == GAME_MODE_MENU:
             draw_background(surface)
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -184,7 +229,8 @@ class Game:
 
             if self.selected_square is None:
                 selected_piece = self.board.piece_at(square)
-                if selected_piece and selected_piece.color == self.board.turn and self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]: # Thêm "NO_TIMER" vào đây
+                if selected_piece and selected_piece.color == self.board.turn and self.game_mode in [PVP_MODE, PVE_MODE,
+                                                                                                     "NO_TIMER"]:
                     self.selected_square = (row, col)
                     legal_moves = self.game.get_legal_moves()
                     self.legal_targets = [
@@ -205,11 +251,19 @@ class Game:
                     move_uci += "q"  # Phong hậu
 
                 if move_uci in self.game.get_legal_moves() and self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]:
+                    # Kiểm tra xem có quân cờ nào bị ăn không
+                    captured_piece = self.board.piece_at(to_sq)
+                    if captured_piece:
+                        if captured_piece.color == chess.WHITE:
+                            self.captured_pieces_white.append(captured_piece)
+                        else:
+                            self.captured_pieces_black.append(captured_piece)
+
                     self.game.push_move(move_uci)
                     self.board = self.game.get_board()
-                    if self.current_player == chess.WHITE:
+                    if self.current_player == chess.WHITE and self.game_mode != "NO_TIMER":
                         self.player1_time += self.increment
-                    else:
+                    elif self.current_player == chess.BLACK and self.game_mode != "NO_TIMER":
                         self.player2_time += self.increment
                     self.current_player = not self.current_player
                     self.selected_square = None
@@ -217,7 +271,9 @@ class Game:
                 else:
                     # Nếu click vào một ô khác khi đang chọn quân, bỏ chọn hoặc chọn quân mới
                     selected_piece = self.board.piece_at(square)
-                    if selected_piece and selected_piece.color == self.board.turn and self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]:
+                    if selected_piece and selected_piece.color == self.board.turn and self.game_mode in [PVP_MODE,
+                                                                                                         PVE_MODE,
+                                                                                                         "NO_TIMER"]:
                         self.selected_square = (row, col)
                         legal_moves = self.game.get_legal_moves()
                         self.legal_targets = [
@@ -269,22 +325,22 @@ class Game:
                         self.game_state = GAME_MODE
                         break
             elif self.game_state == GAME_MODE:
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        self.game_state = MAIN_MENU_WITH_BUTTONS
-                        self.game_mode = None
-                        self.selected_square = None
-                        self.legal_targets = []
-                        self.game.reset_game()
+                # if event.type == pygame.KEYDOWN:
+                #   if event.key == pygame.K_ESCAPE:
+                #      self.game_state = MAIN_MENU_WITH_BUTTONS
+                #     self.game_mode = None
+                #     self.selected_square = None
+                #     self.legal_targets = []
+                #    self.game.reset_game()
 
-                if self.resign_white_button.is_clicked(event) :
+                if self.resign_white_button.is_clicked(event):
                     self.game.declare_winner(chess.BLACK)
                     self.handle_game_over()
-                elif self.resign_black_button.is_clicked(event) :
+                elif self.resign_black_button.is_clicked(event):
                     self.game.declare_winner(chess.WHITE)
                     self.handle_game_over()
 
-                if self.game_mode in [PVP_MODE, PVE_MODE,"NO_TIMER"]:
+                if self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]:
                     self.handle_player_click(event)
 
                 elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
@@ -295,12 +351,12 @@ class Game:
                         move = random.choice(legal_moves)
                         self.game.push_move(move)
                         self.board = self.game.get_board()
-                        self.current_player = not self.current_player # Chuyển lượt
-        #         """AI minimax"""
-        #         _, best_move = minimax(self.board, depth=3, alpha=float('-inf'), beta=float('inf'), is_maximizing=True)
-        #         if best_move:
-        #             self.board.push(best_move)
-        #             self.current_player = not self.current_player # Chuyển lượt
+                        self.current_player = not self.current_player  # Chuyển lượt
+            #         """AI minimax"""
+            #         _, best_move = minimax(self.board, depth=3, alpha=float('-inf'), beta=float('inf'), is_maximizing=True)
+            #         if best_move:
+            #             self.board.push(best_move)
+            #             self.current_player = not self.current_player # Chuyển lượt
             elif self.game_state == GAME_OVER_SCREEN:
                 if pygame.time.get_ticks() - self.game_over_time > 4000:
                     if self.rematch_button and self.rematch_button.is_clicked(event):
@@ -332,6 +388,7 @@ class Game:
                 self.update_timer(dt)
                 if self.game.is_game_over() and not self.game_over:
                     self.handle_game_over()
+
 
 if __name__ == "__main__":
     game = Game()
