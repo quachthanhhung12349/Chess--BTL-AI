@@ -152,10 +152,16 @@ def evaluate(board):
     white_king_file = chess.square_file(white_king)
     black_king_file = chess.square_file(black_king)
     for file in range(max(0, white_king_file - 1), min(8, white_king_file + 2)):
-        if not any(p in white_pawns for p in chess.BB_FILES[file] & chess.BB_RANKS[0:3]):
+        # Kết hợp hàng 1-3 thành một bitboard
+        rank_mask = chess.BB_RANKS[0] | chess.BB_RANKS[1] | chess.BB_RANKS[2]
+        file_rank_intersection = chess.BB_FILES[file] & rank_mask
+        if not any(p in white_pawns for p in chess.SquareSet(file_rank_intersection)):
             king_safety_score -= 30  # Cột mở gần vua Trắng
     for file in range(max(0, black_king_file - 1), min(8, black_king_file + 2)):
-        if not any(p in black_pawns for p in chess.BB_FILES[file] & chess.BB_RANKS[5:8]):
+        # Kết hợp hàng 6-8 thành một bitboard
+        rank_mask = chess.BB_RANKS[5] | chess.BB_RANKS[6] | chess.BB_RANKS[7]
+        file_rank_intersection = chess.BB_FILES[file] & rank_mask
+        if not any(p in black_pawns for p in chess.SquareSet(file_rank_intersection)):
             king_safety_score += 30  # Cột mở gần vua Đen
 
     total_score += king_safety_score
@@ -206,7 +212,7 @@ def evaluate(board):
         coordination_score -= 50
     open_files = [
         f for f in range(8)
-        if not any(p in white_pawns | black_pawns for p in chess.BB_FILES[f])
+        if not (chess.BB_FILES[f] & (white_pawns | black_pawns).mask)
     ]
     for file in open_files:
         file_squares = chess.BB_FILES[file]
