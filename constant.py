@@ -40,6 +40,14 @@ EXTENDED_CENTER = {
     chess.E3, chess.E6,
     chess.F3, chess.F4, chess.F5, chess.F6
 }
+# Bonus for forks
+FORK_BONUS = 40
+
+# Bonus for forks that include a check
+FORK_CHECK_BONUS = 80
+
+# Bonus for absolute pins (pinned piece cannot move)
+PIN_ABSOLUTE_BONUS = 80
 
 MAIN_MENU = "manin_menu"
 MAIN_MENU_WITH_BUTTONS = "main_menu_with_buttons"

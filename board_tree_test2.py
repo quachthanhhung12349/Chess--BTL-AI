@@ -95,9 +95,9 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limi
     # --- End Time Check ---
 
     if qs_depth == 0:
-        return evaluation_basic.evaluate_diff(board) * color, None # Return value and None for move
+        return evaluation_advanced.evaluate_diff(board) * color, None # Return value and None for move
 
-    stand_pat = evaluation_basic.evaluate_diff(board) * color
+    stand_pat = evaluation_advanced.evaluate_diff(board) * color
     alpha = max(alpha, stand_pat)
     if alpha >= beta:
         return stand_pat, None
