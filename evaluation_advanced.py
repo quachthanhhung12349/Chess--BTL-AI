@@ -1,4 +1,5 @@
 import chess
+import time
 
 piece_values = [0, 100, 300, 330, 500, 900, 10000]
 

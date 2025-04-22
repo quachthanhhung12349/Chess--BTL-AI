@@ -168,9 +168,8 @@ def get_pst(piece_type, square, game_phase, is_white):
     opening_pst = PST[piece_type]['opening']
     endgame_pst = PST[piece_type]['endgame']
 
-    # Đối xứng cho Đen
     if not is_white:
-        square = chess.square_mirror(square)
+        square = (56 + 2 * (square % 8)) - square
 
     opening_value = opening_pst[square]
     endgame_value = endgame_pst[square]

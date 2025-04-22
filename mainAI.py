@@ -2,8 +2,7 @@ import chess
 import random
 import time
 
-from board_tree import find_best_move, BoardTreeNode
-from evaluation_basic import evaluate
+from board_tree import find_best_move, BoardTreeNode, find_best_move
 
 
 def game_end(chessboard):
@@ -17,24 +16,41 @@ def game_end(chessboard):
         return True
     return False
 
+if __name__ == "__main__":
+    board = chess.Board()
 
-board = chess.Board()
+    legal_moves = []
+    while True:
+        node2 = BoardTreeNode(board,  0, None)
+        find_best_move_iterative(node2, 4)
+        best_move = node2.minimax_move
 
-legal_moves = []
-while not game_end(board):
-    best_move = find_best_move(BoardTreeNode(board, True, 0, None), 3)
+        print(best_move)
+        board.push_san(str(best_move))
+        print(board)
+        print("")
+        if game_end(board):
+            break
 
-    print(best_move)
-    board.push_san(str(best_move))
-    print(board)
-    print("")
+        node3 = BoardTreeNode(board, 0, None)
+        find_best_move(node3, 4)
+        best_move = node3.minimax_move
 
-    legal_moves = list(board.legal_moves)
-    board.push_san(str(random.choice(legal_moves)))
-    print(board)
-    print("")
+        print(best_move)
+        board.push_san(str(best_move))
+        print(board)
+        print("")
+
+        if game_end(board):
+            break
 
 
-print(board.outcome())
+    print(board.outcome())
 
-print(evaluate(board))
+    print(count_material(board))
+
+
+
+
+
+

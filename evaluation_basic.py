@@ -1,4 +1,5 @@
 import chess
+import time
 from constant import CENTER_SQUARES, EXTENDED_CENTER
 from dynamic_PstAndPieceValue import get_piece_value, get_pst
 
@@ -39,16 +40,18 @@ def evaluate(board):
     # 2. Bảng vị trí quân cờ (PST)
     position_score = 0
     for square, piece in board.piece_map().items():
-        position_score += get_pst(piece.piece_type, square, game_phase, piece.color == chess.WHITE)
-        # Điểm âm cho Đen
-        if piece.color == chess.BLACK:
-            position_score = -position_score
+        if (piece.color == chess.WHITE):
+            position_score += get_pst(piece.piece_type, square, game_phase, True)
+        else:
+            position_score -= get_pst(piece.piece_type, square, game_phase, False)
+
     total_score += position_score
 
     # 3. Cấu trúc tốt (Pawn Structure)
     pawn_structure_score = 0
     white_pawns = board.pieces(chess.PAWN, chess.WHITE)
     black_pawns = board.pieces(chess.PAWN, chess.BLACK)
+
 
     # Tốt thông (Passed Pawns)
     for pawn in white_pawns:
@@ -406,3 +409,18 @@ def evaluate(board):
 
     # Điều chỉnh điểm số dựa trên lượt đi
     return total_score if board.turn == chess.WHITE else -total_score
+
+def evaluate_diff(board):
+    board1 = board.copy()
+    board1.push(chess.Move.null())
+
+    return evaluate(board) + evaluate(board1)
+
+if __name__ == "__main__":
+    board = chess.Board()
+    tic = time.perf_counter()
+
+    print(evaluate(board))
+    toc = time.perf_counter()
+    print(toc - tic)
+
