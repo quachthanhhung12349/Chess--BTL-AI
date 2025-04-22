@@ -252,81 +252,9 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
 
     return best_value, best_move
 
+def find_best_move(board, max_depth, time_limit_sec):
 
 
-def find_best_move_iterative_deepening_tt_book(board, max_depth, time_limit_sec):
-    """
-    Finds the best move using iterative deepening with a time limit,
-    transposition table, and opening book.
-
-    Args:
-        board: The starting chess board state.
-        max_depth: The maximum depth to search if time allows.
-        time_limit_sec: The maximum time allowed for the search in seconds.
-
-    Returns:
-        The best move found within the time limit or from the opening book.
-    """
-    # --- Opening Book Lookup ---
-    if opening_book:
-        try:
-            # Look up the current position in the opening book
-            # weighted_choice() picks a move based on its weight in the book
-            book_move_entry = opening_book.weighted_choice(board)
-            if book_move_entry:
-                book_move = book_move_entry.move
-                print(f"Found book move: {book_move}")
-                return book_move # Return the book move immediately
-        except IndexError:
-            # Position not found in the book or no moves available
-            pass
-        except Exception as e:
-            print(f"Error reading opening book: {e}")
-            pass # Continue to search if book reading fails
-    # --- End Opening Book Lookup ---
-
-    start_time = time.time()
-    best_move_so_far = None
-    principal_variation = []
-
-    color = 1 if board.turn == chess.WHITE else -1
-
-    for depth in range(1, max_depth + 1):
-        if time.time() - start_time > time_limit_sec:
-            print(f"Time limit reached at depth {depth - 1}.")
-            break
-
-        time_left = time_limit_sec - time.time() - start_time
-        # Perform a depth-limited search using the transposition table
-        # Pass a copy of the board to avoid modifying the original during search
-        current_value, current_best_move = negamax(board.copy(), depth, -INF, INF, color, start_time, time_left, principal_variation)
-        print(start_time)
-        print(time_left)
-
-        if time.time() - start_time <= time_limit_sec:
-            best_move_so_far = current_best_move
-            if best_move_so_far:
-                 principal_variation = [best_move_so_far]
-
-            print(f"Depth {depth} completed. Best move: {best_move_so_far}, Value: {current_value}")
-        else:
-            print(f"Depth {depth} did not complete within the time limit.")
-            break
-
-    # If no move was found (e.g., very short time limit and no book move),
-    # fall back to a legal move to avoid crashing. This is a safeguard.
-    if best_move_so_far is None and board.legal_moves:
-        print("Warning: No best move found, returning a random legal move.")
-        return random.choice(list(board.legal_moves))
-
-    return best_move_so_far
-
-
-def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_sec):
-    """
-    Finds the best move using iterative deepening with a time limit,
-    transposition table, opening book, and aspiration windows.
-    """
     # --- Opening Book Lookup ---
     global current_best_move, search_value
     if opening_book:
@@ -341,6 +269,7 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_s
             pass  # Continue to search if book fails
     # --- End Opening Book Lookup ---
 
+
     start_time = time.time()
     best_move_so_far = None
     # Store the score from the previous depth for aspiration windows
@@ -354,6 +283,7 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_s
         if time.time() - start_time > time_limit_sec:
             print(f"Time limit reached at depth {depth - 1}.")
             break
+
 
         # --- Aspiration Window Logic ---
         # Use a loop to handle potential re-searches if the initial window fails
@@ -385,6 +315,7 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_s
                 # Otherwise, the function will return None and the fallback handles it.
                 break  # Exit the while True loop and the for loop
 
+
             # --- Aspiration Window Re-search Logic ---
             if search_value < current_alpha:
                 # Fail low: The true value is <= the lower bound of the window.
@@ -406,7 +337,9 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_s
                 # Success: The search value is within the aspiration window. No re-search needed.
                 break  # Exit the while True loop
 
+
         # --- End Aspiration Window Logic ---
+
 
         # If the search for this depth completed within the time limit (checked above)
         # and the search was successful (not timed out)
@@ -453,7 +386,7 @@ if __name__ == "__main__":
     legal_moves = []
     while True:
         tic = time.perf_counter()
-        best_move = find_best_move_iterative_deepening_tt_book_aw(board, 7, 10)
+        best_move = find_best_move(board, 7, 10)
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)
@@ -464,7 +397,7 @@ if __name__ == "__main__":
             break
 
         tic = time.perf_counter()
-        best_move = find_best_move_iterative_deepening_tt_book_aw(board, 7, 10)
+        best_move = find_best_move(board, 7, 10)
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)
