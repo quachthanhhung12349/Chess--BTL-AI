@@ -343,15 +343,15 @@ class Game:
                 if self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]:
                     self.handle_player_click(event)
 
-                elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
-                    """AI random"""
-                    legal_moves = list(self.board.legal_moves)
-                    if legal_moves:
-                        import random
-                        move = random.choice(legal_moves)
-                        self.game.push_move(move)
-                        self.board = self.game.get_board()
-                        self.current_player = not self.current_player  # Chuyển lượt
+                # elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
+                #     """AI random"""
+                #     legal_moves = list(self.board.legal_moves)
+                #     if legal_moves:
+                #         import random
+                #         move = random.choice(legal_moves)
+                #         self.game.push_move(move)
+                #         self.board = self.game.get_board()
+                #         self.current_player = not self.current_player  # Chuyển lượt
             #         """AI minimax"""
             #         _, best_move = minimax(self.board, depth=3, alpha=float('-inf'), beta=float('inf'), is_maximizing=True)
             #         if best_move:
@@ -384,6 +384,26 @@ class Game:
         if self.game_state == MAIN_MENU:
             self.game_menu.blink_the_text(dt)
         elif self.game_state == GAME_MODE:
+            if self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
+                # AI random move
+                legal_moves = list(self.board.legal_moves)
+                if legal_moves:
+                    import random
+                    move = random.choice(legal_moves)
+                    from_sq = move.from_square
+                    to_sq = move.to_square
+                    captured_piece = self.board.piece_at(to_sq)
+
+                    self.game.push_move(move)
+                    self.board = self.game.get_board()
+
+                    if captured_piece:
+                        if captured_piece.color == chess.WHITE:
+                            self.captured_pieces_white.append(captured_piece)
+                        else:
+                            self.captured_pieces_black.append(captured_piece)
+                    self.current_player = not self.current_player
+                      # Chuyển lượt
             if self.game_mode != "NO_TIMER":
                 self.update_timer(dt)
                 if self.game.is_game_over() and not self.game_over:

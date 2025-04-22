@@ -126,7 +126,12 @@ class ChessGame:
         :return: True nếu nước đi được thực hiện thành công, False nếu không hợp lệ.
         """
         try:
-            move = chess.Move.from_uci(move_uci)
+            if isinstance(move_uci, chess.Move):
+                move = move_uci  # đã là Move rồi thì không cần chuyển đổi
+            else:
+                move = chess.Move.from_uci(move_uci)  # nếu là chuỗi, mới cần chuyển
+
+            # move = chess.Move.from_uci(move_uci)
 
             if move in self.board.legal_moves:
                 piece = self.board.piece_at(move.from_square)
