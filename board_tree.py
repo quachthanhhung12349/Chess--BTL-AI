@@ -15,11 +15,10 @@ TT_UPPERBOUND = 2
 # Define the initial delta for aspiration windows
 ASPIRATION_WINDOW_DELTA = 25 # Centipawns is a common unit
 ASPIRATION_WINDOW_DELTA_AFTER = [50, 100, 200, INF]
-# Transposition Table (using a dictionary for simplicity)
+
 transposition_table = {}
 
 # Define the path to your opening book file
-# Make sure you have a Polyglot (.bin) opening book file
 OPENING_BOOK_PATH = "/home/linux-mint-cb303/Desktop/UET/HK2 2024/AI/Chess--BTL-AI-/Perfect2023.bin" # <--- Update this path
 
 # Global variable to hold the loaded opening book
@@ -137,24 +136,7 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limi
 
 
 def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, principal_variation=None):
-    """
-    Negamax implementation with Alpha-Beta Pruning, Transposition Table, and Time Control.
 
-    Args:
-        board: The current chess board state.
-        depth: The remaining depth to search.
-        alpha: The alpha cutoff value.
-        beta: The beta cutoff value.
-        color: 1 for the maximizing player (White), -1 for the minimizing player (Black).
-        start_time: The time when the search started (from time.time()).
-        time_limit_sec: The maximum time allowed for the search in seconds.
-        principal_variation: The expected best line of play from shallower searches.
-
-
-    Returns:
-        A tuple containing the negamax value of the current node and the best move found.
-        Returns (None, None) if the time limit is exceeded.
-    """
     # --- Time Check at the beginning of the function ---
     if time.time() - start_time > time_limit_sec:
         return None, None # Signal termination due to time
