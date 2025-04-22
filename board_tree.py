@@ -1,6 +1,6 @@
 import chess
 import time
-import evaluation_advanced
+import evaluation_simple
 import random
 import chess.polyglot # Import polyglot for opening book
 
@@ -368,7 +368,7 @@ if __name__ == "__main__":
     legal_moves = []
     while True:
         tic = time.perf_counter()
-        best_move = find_best_move(board, 7, 10)
+        best_move = find_best_move(board, 10, 10)
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)
@@ -379,7 +379,7 @@ if __name__ == "__main__":
             break
 
         tic = time.perf_counter()
-        best_move = find_best_move(board, 7, 10)
+        best_move = find_best_move(board, 10, 10)
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)

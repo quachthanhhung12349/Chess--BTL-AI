@@ -1,7 +1,7 @@
 import chess
 import time
+import evaluation_simple
 import evaluation_advanced
-import evaluation_basic
 import random
 import chess.polyglot # Import polyglot for opening book
 
