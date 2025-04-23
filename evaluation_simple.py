@@ -98,31 +98,35 @@ def endgame(board):
 def evaluation(board):
     material = [0, 0]
     is_endgame = endgame(board)
-    for i in range(0, 64):
-        rank = 7 - (i // 8)
-        file = i % 8
-        if board.piece_at(i) is not None:
-            if not board.color_at(i):
+    for square, piece in board.piece_map().items():
+        rank = 7 - (square // 8)
+        file = square % 8
+        if board.piece_at(square) is not None:
+            if not board.color_at(square):
                 rank = 7 - rank
-            if board.piece_at(i).piece_type == 1:
-                material[board.color_at(i)] += (piece_values[1] + PAWN_TABLE[rank][file])
-            elif board.piece_at(i).piece_type == 2:
-                material[board.color_at(i)] += (piece_values[2] + KNIGHT_TABLE[rank][file])
-            elif board.piece_at(i).piece_type == 3:
-                material[board.color_at(i)] += (piece_values[3] + BISHOP_TABLE[rank][file])
-            elif board.piece_at(i).piece_type == 4:
-                material[board.color_at(i)] += (piece_values[4] + ROOK_TABLE[rank][file])
-            elif board.piece_at(i).piece_type == 5:
-                material[board.color_at(i)] += (piece_values[5] + QUEEN_TABLE[rank][file])
-            elif board.piece_at(i).piece_type == 6:
+            if board.piece_at(square).piece_type == 1:
+                material[board.color_at(square)] += (piece_values[1] + PAWN_TABLE[rank][file])
+            elif board.piece_at(square).piece_type == 2:
+                material[board.color_at(square)] += (piece_values[2] + KNIGHT_TABLE[rank][file])
+            elif board.piece_at(square).piece_type == 3:
+                material[board.color_at(square)] += (piece_values[3] + BISHOP_TABLE[rank][file])
+            elif board.piece_at(square).piece_type == 4:
+                material[board.color_at(square)] += (piece_values[4] + ROOK_TABLE[rank][file])
+            elif board.piece_at(square).piece_type == 5:
+                material[board.color_at(square)] += (piece_values[5] + QUEEN_TABLE[rank][file])
+            elif board.piece_at(square).piece_type == 6:
                 if is_endgame:
-                    material[board.color_at(i)] += (piece_values[6] + KING_ENDGAME_TABLE[rank][file])
+                    material[board.color_at(square)] += (piece_values[6] + KING_ENDGAME_TABLE[rank][file])
                 else:
-                    material[board.color_at(i)] += (piece_values[6] + KING_MIDDLEGAME_TABLE[rank][file])
+                    material[board.color_at(square)] += (piece_values[6] + KING_MIDDLEGAME_TABLE[rank][file])
+
     return material[1] - material[0]
 
 if __name__ == "__main__":
     board1 = chess.Board()
+    tic = time.perf_counter()
     board1.push_san("e2e4")
 
     print(evaluation(board1))
+    toc = time.perf_counter()
+    print(toc - ticy)

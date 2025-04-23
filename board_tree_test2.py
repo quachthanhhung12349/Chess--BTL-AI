@@ -14,8 +14,8 @@ TT_LOWERBOUND = 1
 TT_UPPERBOUND = 2
 
 # Define the initial delta for aspiration windows
-ASPIRATION_WINDOW_DELTA = 25 # Centipawns is a common unit
-ASPIRATION_WINDOW_DELTA_AFTER = [50, 100, 200, INF]
+ASPIRATION_WINDOW_DELTA = 10 # Centipawns is a common unit
+ASPIRATION_WINDOW_DELTA_AFTER = [25, 50, 100, INF]
 # Transposition Table (using a dictionary for simplicity)
 transposition_table = {}
 
@@ -40,10 +40,46 @@ def load_opening_book(book_path):
 # Call this function once at the start of your program
 # load_opening_book(OPENING_BOOK_PATH)
 
+
+PIECE_VALUES = {
+    chess.PAWN: 100,
+    chess.KNIGHT: 300,
+    chess.BISHOP: 320, # Bishops are often slightly more valuable than knights
+    chess.ROOK: 500,
+    chess.QUEEN: 900,
+    chess.KING: 20000 # King's value is high, but not typically used in material count for evaluation
+}
+
+# Helper function to calculate MVV-LVA score
+def calculate_mvv_lva(board, move):
+    """Calculates the MVV-LVA score for a capture move."""
+    # Get the piece being captured (victim)
+    victim_piece_type = board.piece_type_at(move.to_square)
+    if victim_piece_type is None: # Should not happen for a capture, but good practice
+        return 0
+
+    # Get the piece performing the capture (aggressor)
+    aggressor_piece_type = board.piece_type_at(move.from_square)
+    if aggressor_piece_type is None: # Should not happen
+        return 0
+
+    # Get the base values
+    victim_value = PIECE_VALUES.get(victim_piece_type, 0)
+    aggressor_value = PIECE_VALUES.get(aggressor_piece_type, 0)
+
+    # MVV-LVA score: Prioritize capturing high-value pieces.
+    # As a tie-breaker, prioritize using low-value pieces to capture.
+    mvv_lva_score = victim_value * 100 + (100 - aggressor_value)
+
+
+
+    return mvv_lva_score
+
+
 def order_moves(board, principal_variation=None, hash_move=None):
     """
     Orders moves for better alpha-beta pruning.
-    Prioritizes the hash move, then the principal variation, then captures, etc.
+    Prioritizes hash move, principal variation, MVV-LVA captures, then other moves.
     """
     legal_moves = list(board.legal_moves)
 
@@ -61,27 +97,43 @@ def order_moves(board, principal_variation=None, hash_move=None):
              ordered_moves.append(pv_move)
              legal_moves.remove(pv_move)
 
+    # Separate captures and non-captures from the remaining legal moves
+    capture_moves = []
+    other_moves = []
+    for move in legal_moves:
+        if board.is_capture(move):
+            capture_moves.append(move)
+        else:
+            other_moves.append(move)
 
-    # Basic move ordering: prioritize captures
-    capture_moves = [move for move in legal_moves if board.is_capture(move)]
-    other_moves = [move for move in legal_moves if not board.is_capture(move)]
+    # --- Implement MVV-LVA for Capture Moves ---
+    # Calculate MVV-LVA score for each capture move
+    capture_moves_with_scores = [(move, calculate_mvv_lva(board, move)) for move in capture_moves]
 
+    # Sort capture moves by MVV-LVA score in descending order
+    capture_moves_with_scores.sort(key=lambda item: item[1], reverse=True)
 
-    ordered_moves.extend(capture_moves)
-    ordered_moves.extend(other_moves)
+    # Extract the sorted capture moves
+    sorted_capture_moves = [move for move, score in capture_moves_with_scores]
+    # --- End MVV-LVA ---
 
-    # Remove duplicates while maintaining order
+    # Extend the ordered moves list with sorted captures and then other moves
+    ordered_moves.extend(sorted_capture_moves)
+    ordered_moves.extend(other_moves) # Non-captures are added after captures
+
+    # Remove potential duplicates that might have been added if PV or hash move was also a capture
     seen = set()
     ordered_moves_unique = []
     for move in ordered_moves:
-        #print("move")
         if move not in seen:
             ordered_moves_unique.append(move)
             seen.add(move)
 
     return ordered_moves_unique
 
-QS_MAX_DEPTH = 1
+
+
+QS_MAX_DEPTH = 0
 # Assuming quiescence_search is implemented as previously discussed
 # (It will also need to accept start_time and time_limit_sec)
 def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limit_sec):
@@ -95,9 +147,9 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limi
     # --- End Time Check ---
 
     if qs_depth == 0:
-        return evaluation_basic.evaluate_diff(board) * color, None # Return value and None for move
+        return evaluation_simple.evaluation(board) * color, None # Return value and None for move
 
-    stand_pat = evaluation_basic.evaluate_diff(board) * color
+    stand_pat = evaluation_simple.evaluation(board) * color
     alpha = max(alpha, stand_pat)
     if alpha >= beta:
         return stand_pat, None

@@ -206,6 +206,7 @@ def evaluate(board):
     total_score += space_score
 
     # 9. Sự phối hợp của các quân (Piece Coordination)
+    print(9)
     coordination_score = 0
     white_bishops = len(board.pieces(chess.BISHOP, chess.WHITE))
     black_bishops = len(board.pieces(chess.BISHOP, chess.BLACK))
@@ -219,6 +220,7 @@ def evaluate(board):
     ]
     for file in open_files:
         file_squares = chess.BB_FILES[file]
+
         white_rooks = len([r for r in board.pieces(chess.ROOK, chess.WHITE) if r in file_squares])
         white_queens = len([q for q in board.pieces(chess.QUEEN, chess.WHITE) if q in file_squares])
         black_rooks = len([r for r in board.pieces(chess.ROOK, chess.BLACK) if r in file_squares])
@@ -418,6 +420,12 @@ def evaluate_diff(board):
 
 if __name__ == "__main__":
     board = chess.Board()
+    board.push_san("e2e3")
+    board.push_san("e7e6")
+    board.push_san("f1c4")
+    board.push_san("f8c5")
+    board.push_san("c4e6")
+    board.push_san("c5e3")
     tic = time.perf_counter()
 
     print(evaluate(board))

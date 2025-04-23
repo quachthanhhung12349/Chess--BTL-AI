@@ -2,7 +2,8 @@ import chess
 import time
 import evaluation_simple
 import random
-import chess.polyglot # Import polyglot for opening book
+import chess.polyglot
+import evaluation_advanced# Import polyglot for opening book
 
 # Define infinity
 INF = float('inf')
@@ -93,9 +94,9 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limi
     # --- End Time Check ---
 
     if qs_depth == 0:
-        return evaluation_advanced.evaluation(board) * color, None # Return value and None for move
+        return evaluation_advanced.evaluate(board) * color, None # Return value and None for move
 
-    stand_pat = evaluation_advanced.evaluation(board) * color
+    stand_pat = evaluation_advanced.evaluate(board) * color
     alpha = max(alpha, stand_pat)
     if alpha >= beta:
         return stand_pat, None
@@ -364,7 +365,12 @@ def game_end(board):
 # Assuming 'initial_board' is a chess.Board object
 if __name__ == "__main__":
     board = chess.Board()
-
+    board.push_san("e2e3")
+    board.push_san("e7e6")
+    board.push_san("f1c4")
+    board.push_san("f8c5")
+    board.push_san("c4e6")
+    board.push_san("c5e3")
     legal_moves = []
     while True:
         tic = time.perf_counter()
