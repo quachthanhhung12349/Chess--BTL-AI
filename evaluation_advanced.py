@@ -301,7 +301,9 @@ def evaluate(board):
             if board.king(chess.BLACK) in attacks:
                 attacked_pieces.append(board.king(chess.BLACK))
             if len(attacked_pieces) >= 2:
-                white_threats += FORK_CHECK_BONUS if board.king(chess.BLACK) in attacked_pieces else FORK_BONUS
+                # Adjusted bonus for forks involving the king
+                fork_bonus = 50 if board.king(chess.BLACK) in attacked_pieces else FORK_BONUS
+                white_threats += fork_bonus
         for piece_square in board.pieces(piece_type, chess.BLACK):
             attacks = get_attacks(board, piece_square)
             attacked_pieces = [
@@ -312,8 +314,10 @@ def evaluate(board):
             if board.king(chess.WHITE) in attacks:
                 attacked_pieces.append(board.king(chess.WHITE))
             if len(attacked_pieces) >= 2:
-                black_threats += FORK_CHECK_BONUS if board.king(chess.WHITE) in attacked_pieces else FORK_BONUS
-    threats_weight = 0.9 * game_phase + 0.5 * (1 - game_phase)
+                # Adjusted bonus for forks involving the king
+                fork_bonus = 50 if board.king(chess.WHITE) in attacked_pieces else FORK_BONUS
+                black_threats += fork_bonus
+    threats_weight = 0.8 * game_phase + 0.45 * (1 - game_phase)
     total_score += (white_threats - black_threats) * threats_weight
 
     # Endgame Adjustments
