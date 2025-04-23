@@ -129,4 +129,4 @@ if __name__ == "__main__":
 
     print(evaluation(board1))
     toc = time.perf_counter()
-    print(toc - ticy)
+    print(toc - tic)

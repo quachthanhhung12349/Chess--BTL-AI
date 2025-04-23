@@ -1,6 +1,7 @@
 
 import chess
 import chess.polyglot
+import time
 from constant import CENTER_SQUARES, EXTENDED_CENTER, FORK_BONUS, FORK_CHECK_BONUS, PIN_ABSOLUTE_BONUS
 from dynamic_PstAndPieceValue import get_piece_value, get_pst
 
@@ -333,3 +334,12 @@ def evaluate(board):
                 total_score -= 100
 
     return total_score if board.turn == chess.WHITE else -total_score
+
+if __name__ == "__main__":
+    board1 = chess.Board()
+    tic = time.perf_counter()
+    #board1.push_san("e2e4")
+
+    print(evaluate(board1))
+    toc = time.perf_counter()
+    print(toc - tic)
