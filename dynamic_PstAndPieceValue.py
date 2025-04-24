@@ -168,10 +168,12 @@ def get_pst(piece_type, square, game_phase, is_white):
     opening_pst = PST[piece_type]['opening']
     endgame_pst = PST[piece_type]['endgame']
 
-    if not is_white:
-        square = (56 + 2 * (square % 8)) - square
+    if is_white:
+        square = square ^ 56
+
 
     opening_value = opening_pst[square]
     endgame_value = endgame_pst[square]
+    #print(f"Piece: {piece_type}, Square: {square}, Score: {opening_pst[square]}")
 
     return opening_value * game_phase + endgame_value * (1 - game_phase)

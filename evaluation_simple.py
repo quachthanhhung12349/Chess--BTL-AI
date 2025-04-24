@@ -95,7 +95,7 @@ def endgame(board):
 
 
 
-def evaluation(board):
+def evaluate(board):
     material = [0, 0]
     is_endgame = endgame(board)
     for square, piece in board.piece_map().items():
@@ -127,6 +127,6 @@ if __name__ == "__main__":
     tic = time.perf_counter()
     board1.push_san("e2e4")
 
-    print(evaluation(board1))
+    print(evaluate(board1))
     toc = time.perf_counter()
     print(toc - tic)

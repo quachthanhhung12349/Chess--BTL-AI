@@ -55,3 +55,8 @@ GAME_MODE = "game_mode"
 PVP_MODE = "pvp_mode"
 PVE_MODE = "pve_mode"
 AI_MATCHING_MODE = "ai_matching_mode"
+
+BOARD_SIZE = 800
+GAME_MODE_MENU = "game_mode_menu"
+
+GAME_OVER_SCREEN = "game_over_screen"

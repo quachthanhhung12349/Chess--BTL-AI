@@ -5,6 +5,8 @@ import time
 from constant import CENTER_SQUARES, EXTENDED_CENTER, FORK_BONUS, FORK_CHECK_BONUS, PIN_ABSOLUTE_BONUS
 from dynamic_PstAndPieceValue import get_piece_value, get_pst
 
+zobrist_key = None
+
 # Precomputed king attack bitboards
 BB_KING_ATTACKS = {s: chess.BB_KING_ATTACKS[s] for s in chess.SQUARES}
 
@@ -18,28 +20,28 @@ piece_map_cache = {}
 
 def get_attacks(board, square):
     """Get attack squares for a piece, cached."""
-    cache_key = (chess.polyglot.zobrist_hash(board), square)
+    cache_key = (zobrist_key, square)
     if cache_key not in attack_cache:
         attack_cache[cache_key] = board.attacks(square)
     return attack_cache[cache_key]
 
 def get_attackers(board, square, color):
     """Get attackers of a square for a color, cached."""
-    cache_key = (chess.polyglot.zobrist_hash(board), square, color)
+    cache_key = (zobrist_key, square, color)
     if cache_key not in attackers_cache:
         attackers_cache[cache_key] = board.attackers(color, square)
     return attackers_cache[cache_key]
 
 def is_pinned(board, color, square):
     """Check if a piece is pinned, cached."""
-    cache_key = (chess.polyglot.zobrist_hash(board), color, square)
+    cache_key = (zobrist_key, color, square)
     if cache_key not in pin_cache:
         pin_cache[cache_key] = board.is_pinned(color, square)
     return pin_cache[cache_key]
 
 def get_open_files(board, white_pawns, black_pawns):
     """Get open files (no pawns), cached."""
-    cache_key = chess.polyglot.zobrist_hash(board)
+    cache_key = zobrist_key
     if cache_key not in open_files_cache:
         pawn_bitboard = (white_pawns | black_pawns).mask
         open_files_cache[cache_key] = [
@@ -49,7 +51,7 @@ def get_open_files(board, white_pawns, black_pawns):
 
 def get_semi_open_files(board, white_pawns, black_pawns):
     """Get semi-open files (pawns of one side only), cached."""
-    cache_key = chess.polyglot.zobrist_hash(board)
+    cache_key = zobrist_key
     if cache_key not in semi_open_files_cache:
         white_pawn_files = set(chess.square_file(p) for p in white_pawns)
         black_pawn_files = set(chess.square_file(p) for p in black_pawns)
@@ -61,12 +63,13 @@ def get_semi_open_files(board, white_pawns, black_pawns):
 
 def get_piece_map(board):
     """Get piece map, cached."""
-    cache_key = chess.polyglot.zobrist_hash(board)
+    cache_key = zobrist_key
     if cache_key not in piece_map_cache:
         piece_map_cache[cache_key] = board.piece_map()
     return piece_map_cache[cache_key]
 
 def evaluate(board):
+    zobrist_key = chess.polyglot.zobrist_hash(board)
     """Evaluate the board position, returning a score (positive favors White)."""
     # Clear caches to prevent memory leaks
     attack_cache.clear()
@@ -101,13 +104,16 @@ def evaluate(board):
     for square, piece in piece_map.items():
         material[piece.color] += get_piece_value(piece.piece_type, game_phase)
     total_score += material[chess.WHITE] - material[chess.BLACK]
+    #print(total_score)
 
     # Piece-Square Tables
     position_score = 0
     for square, piece in piece_map.items():
         score = get_pst(piece.piece_type, square, game_phase, piece.color == chess.WHITE)
+        #print(f"Piece: {piece}, Square: {square}, Score: {score}")
         position_score += score if piece.color == chess.WHITE else -score
     total_score += position_score
+    #print(total_score)
 
     # Pawn Structure
     pawn_structure_score = 0
@@ -143,6 +149,7 @@ def evaluate(board):
         if black_pawns_in_file > 1:
             pawn_structure_score -= 15 * (black_pawns_in_file - 1)
     total_score += pawn_structure_score
+    #print(total_score)
 
     # Combined Mobility, Center Control, and Space
     mobility_score = 0
@@ -178,6 +185,7 @@ def evaluate(board):
     mobility_weight = 4 * game_phase + 2 * (1 - game_phase)
     mobility_score = (white_mobility - black_mobility) * mobility_weight
     total_score += mobility_score + center_control_score + space_score
+    #print(total_score)
 
     # Outposts
     outpost_score = 0
@@ -214,6 +222,7 @@ def evaluate(board):
             if is_outpost:
                 outpost_score += 20 if piece.color == chess.WHITE else -20
     total_score += outpost_score
+    #print(total_score)
 
     # King Safety
     king_safety_score = 0
@@ -232,6 +241,7 @@ def evaluate(board):
     if black_king_file in semi_open_files['white']:
         king_safety_score += 20
     total_score += king_safety_score
+    #print(total_score)
 
     # Piece Coordination
     coordination_score = 0
@@ -252,11 +262,13 @@ def evaluate(board):
         if black_rooks >= 1 and black_queens >= 1:
             coordination_score -= 20
     total_score += coordination_score
+    #print(total_score)
 
     # Rook on Seventh
     white_rooks_on_seventh = len([r for r in board.pieces(chess.ROOK, chess.WHITE) if chess.square_rank(r) == 6])
     black_rooks_on_seventh = len([r for r in board.pieces(chess.ROOK, chess.BLACK) if chess.square_rank(r) == 1])
     total_score += (white_rooks_on_seventh - black_rooks_on_seventh) * 30
+    #print(total_score)
 
     # Threats (Forks and Pins)
     threats_score = 0
@@ -316,6 +328,7 @@ def evaluate(board):
                 black_threats += FORK_CHECK_BONUS if board.king(chess.WHITE) in attacked_pieces else FORK_BONUS
     threats_weight = 0.9 * game_phase + 0.5 * (1 - game_phase)
     total_score += (white_threats - black_threats) * threats_weight
+    #print(total_score)
 
     # Endgame Adjustments
     if game_phase < 0.2:
@@ -332,13 +345,15 @@ def evaluate(board):
             rank = chess.square_rank(pawn)
             if rank <= 1:
                 total_score -= 100
+    #print(total_score)
 
-    return total_score if board.turn == chess.WHITE else -total_score
+    return total_score
 
 if __name__ == "__main__":
     board1 = chess.Board()
     tic = time.perf_counter()
-    #board1.push_san("e2e4")
+    board1.push_san("e2e4")
+    board1.push_san("e7e6")
 
     print(evaluate(board1))
     toc = time.perf_counter()

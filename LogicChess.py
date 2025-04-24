@@ -156,3 +156,9 @@ class ChessGame:
     def reset_game(self):
         """Thiết lập lại bàn cờ để bắt đầu ván mới."""
         self.board.reset()
+
+    def declare_winner(self, winner_color):
+        if winner_color == chess.WHITE:
+            self.game_over_status = "White wins"
+        elif winner_color == chess.BLACK:
+            self.game_over_status = "Black wins"

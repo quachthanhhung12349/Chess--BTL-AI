@@ -4,6 +4,9 @@ import evaluation_simple
 import evaluation_advanced
 import random
 import chess.polyglot # Import polyglot for opening book
+import sys
+
+sys.setrecursionlimit(10000) # Increase recursion limit for deep searches
 
 # Define infinity
 INF = float('inf')
@@ -18,6 +21,19 @@ ASPIRATION_WINDOW_DELTA = 10 # Centipawns is a common unit
 ASPIRATION_WINDOW_DELTA_AFTER = [25, 50, 100, INF]
 # Transposition Table (using a dictionary for simplicity)
 transposition_table = {}
+
+# Add global tables for Killer Moves and History Heuristic
+MAX_SEARCH_DEPTH = 20 # Define a reasonable maximum search depth for table size
+KILLER_MOVES_COUNT = 2 # Store up to 2 killer moves per depth
+
+# Initialize killer moves table with None (or chess.Move.null())
+# killer_moves[depth][move_index]
+killer_moves = [[None for _ in range(KILLER_MOVES_COUNT)] for _ in range(MAX_SEARCH_DEPTH)]
+
+# Initialize history table
+# history_table[from_square][to_square]
+history_table = [[0 for _ in range(64)] for _ in range(64)]
+
 
 # Define the path to your opening book file
 # Make sure you have a Polyglot (.bin) opening book file
@@ -76,52 +92,76 @@ def calculate_mvv_lva(board, move):
     return mvv_lva_score
 
 
-def order_moves(board, principal_variation=None, hash_move=None):
+def order_moves(board, current_depth, principal_variation=None, hash_move=None):
     """
-    Orders moves for better alpha-beta pruning.
-    Prioritizes hash move, principal variation, MVV-LVA captures, then other moves.
+    Orders moves for better alpha-beta pruning using MVV-LVA, Killer Moves, and History Heuristic.
+    Args:
+        board: The current chess board state.
+        current_depth: The current search depth (needed for Killer Moves).
+        principal_variation: The expected best line of play from shallower searches.
+        hash_move: The best move from the transposition table for this position.
+
+    Returns:
+        A list of legal moves ordered by heuristics.
     """
     legal_moves = list(board.legal_moves)
 
+    # 1. Prioritize Hash Move
     ordered_moves = []
-
-    # Prioritize the hash move from the transposition table
     if hash_move and hash_move in legal_moves:
         ordered_moves.append(hash_move)
-        legal_moves.remove(hash_move)
+        legal_moves.remove(hash_move) # Remove from legal_moves to avoid duplicates later
 
-    # Prioritize the principal variation from the previous iterative deepening iteration
+    # 2. Prioritize Principal Variation Move
     if principal_variation:
          pv_move = principal_variation[0] if principal_variation else None
          if pv_move and pv_move in legal_moves:
              ordered_moves.append(pv_move)
-             legal_moves.remove(pv_move)
+             legal_moves.remove(pv_move) # Remove from legal_moves
 
-    # Separate captures and non-captures from the remaining legal moves
+    # Separate remaining moves into captures and quiet moves
     capture_moves = []
-    other_moves = []
+    quiet_moves = []
     for move in legal_moves:
         if board.is_capture(move):
             capture_moves.append(move)
         else:
-            other_moves.append(move)
+            quiet_moves.append(move)
 
-    # --- Implement MVV-LVA for Capture Moves ---
+    # 3. Order Captures using MVV-LVA
     # Calculate MVV-LVA score for each capture move
     capture_moves_with_scores = [(move, calculate_mvv_lva(board, move)) for move in capture_moves]
-
     # Sort capture moves by MVV-LVA score in descending order
     capture_moves_with_scores.sort(key=lambda item: item[1], reverse=True)
-
-    # Extract the sorted capture moves
     sorted_capture_moves = [move for move, score in capture_moves_with_scores]
-    # --- End MVV-LVA ---
 
-    # Extend the ordered moves list with sorted captures and then other moves
+    # 4. Prioritize Killer Moves (for the current depth) within Quiet Moves
+    killer_moves_for_depth = []
+    if 0 <= current_depth < MAX_SEARCH_DEPTH:
+        killer_moves_for_depth = killer_moves[current_depth]
+
+    killer_moves_to_add = []
+    remaining_quiet_moves = []
+    for move in quiet_moves:
+        if move in killer_moves_for_depth:
+            killer_moves_to_add.append(move)
+        else:
+            remaining_quiet_moves.append(move)
+
+    # 5. Order Remaining Quiet Moves using History Heuristic
+    # Calculate history score for each remaining quiet move
+    quiet_moves_with_scores = [(move, history_table[move.from_square][move.to_square]) for move in remaining_quiet_moves]
+    # Sort quiet moves by history score in descending order
+    quiet_moves_with_scores.sort(key=lambda item: item[1], reverse=True)
+    sorted_quiet_moves = [move for move, score in quiet_moves_with_scores]
+
+
+    # Combine all ordered move types
     ordered_moves.extend(sorted_capture_moves)
-    ordered_moves.extend(other_moves) # Non-captures are added after captures
+    ordered_moves.extend(killer_moves_to_add) # Add killer moves after captures
+    ordered_moves.extend(sorted_quiet_moves) # Add history-ordered quiet moves after killers
 
-    # Remove potential duplicates that might have been added if PV or hash move was also a capture
+    # Remove any potential duplicates that might have slipped through (less likely now but safe)
     seen = set()
     ordered_moves_unique = []
     for move in ordered_moves:
@@ -191,33 +231,18 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limi
 
 def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, principal_variation=None):
     """
-    Negamax implementation with Alpha-Beta Pruning, Transposition Table, and Time Control.
-
-    Args:
-        board: The current chess board state.
-        depth: The remaining depth to search.
-        alpha: The alpha cutoff value.
-        beta: The beta cutoff value.
-        color: 1 for the maximizing player (White), -1 for the minimizing player (Black).
-        start_time: The time when the search started (from time.time()).
-        time_limit_sec: The maximum time allowed for the search in seconds.
-        principal_variation: The expected best line of play from shallower searches.
-
-
-    Returns:
-        A tuple containing the negamax value of the current node and the best move found.
-        Returns (None, None) if the time limit is exceeded.
+    Negamax implementation with Alpha-Beta, Transposition Table, Time Control,
+    and updates for Killer/History heuristics.
     """
-    # --- Time Check at the beginning of the function ---
+    # --- Time Check ---
     if time.time() - start_time > time_limit_sec:
         return None, None # Signal termination due to time
     # --- End Time Check ---
 
-
     board_hash = chess.polyglot.zobrist_hash(board)
 
     # --- Transposition Table Lookup ---
-    # (Keep the existing TT lookup logic here)
+    # ... (Keep existing TT lookup logic) ...
     if board_hash in transposition_table:
        entry = transposition_table[board_hash]
        if entry['depth'] >= depth:
@@ -233,50 +258,80 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
            if alpha >= beta:
                return tt_value, entry.get('best_move')
 
-
-    # --- Base case: Reached search depth or game over ---
+    # --- Base case ---
     if depth == 0:
+        # ... (Call quiescence_search with time parameters) ...
         if board.is_game_over():
              if board.is_checkmate():
                  return -INF * color, None
              elif board.is_stalemate():
                   return 0, None
         else:
-            # Call quiescence search with time parameters
             value, _ = quiescence_search(board, alpha, beta, color, QS_MAX_DEPTH, start_time, time_limit_sec)
-            # --- Handle Time Termination from QS ---
-            if value is None:
-                return None, None # Propagate the termination signal
-            # --- End Time Termination Handling ---
-            return value, None # QS returns the value, not a move for the main search
+            if value is None: return None, None
+            return value, None
 
 
-    # --- Rest of Negamax (Move ordering, loop, recursive call, TT store) ---
+    # --- Get hash move for move ordering ---
     hash_move = transposition_table.get(board_hash, {}).get('best_move')
-    move_order = order_moves(board, principal_variation, hash_move)
+
+    # --- Order moves using advanced heuristics ---
+    # Pass the current depth to order_moves for Killer Moves
+    move_order = order_moves(board, depth, principal_variation, hash_move)
 
     best_value = -INF
     best_move = None
-
     original_alpha = alpha # Store original alpha for TT
 
     for move in move_order:
-        # --- Time Check before making a move and recursing ---
+        # --- Time Check ---
         if time.time() - start_time > time_limit_sec:
-             return None, None # Signal termination due to time
+             return None, None
         # --- End Time Check ---
 
         board.push(move)
-        # Recursive call to negamax with time parameters
-        value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, time_limit_sec, principal_variation)
+        # Recursive call to negamax
+        value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, time_limit_sec, principal_variation) # Pass principal_variation
         board.pop()
 
-        # --- Handle Time Termination from recursive call ---
+        # --- Handle Time Termination ---
         if value is None:
              return None, None # Propagate the termination signal
         # --- End Time Termination Handling ---
 
-        value = -value # Negate value after the recursive call returns a valid score
+        value = -value # Negate value
+
+        # --- Update Killer and History heuristics on Beta Cutoff ---
+        # Check if this move caused a beta cutoff (value >= beta)
+        # and if it was a quiet move (not a capture)
+        # Note: The check `value >= beta` should use the `beta` value
+        # that was passed *into* the current negamax call.
+        # This logic happens *after* the recursive call and value negation.
+
+        # The condition `value >= beta` means the current move's value is at least beta,
+        # which would cause a cutoff in the parent node. This move is good.
+        # We also need to check if it caused a cutoff *in this node's loop*.
+        # A simpler check is: if the new alpha (max(original_alpha, value)) becomes >= beta,
+        # then the current move *might* be the one causing the cutoff.
+        # We update heuristics if the value is >= the *original* beta passed in.
+
+        if value >= beta:
+             # This move caused a beta cutoff. Update Killer and History.
+             if not board.is_capture(move): # Only update for quiet moves
+                 # Update Killer Moves
+                 if 0 <= depth < MAX_SEARCH_DEPTH:
+                     # Add the move to the killer table for this depth.
+                     # Simple replacement: if the table is full, shift entries.
+                     # More robust: check if the move is already there.
+                     if move not in killer_moves[depth]:
+                         killer_moves[depth].insert(0, move) # Add to the front
+                         if len(killer_moves[depth]) > KILLER_MOVES_COUNT:
+                             killer_moves[depth].pop() # Remove the oldest if over limit
+
+                 # Update History Heuristic
+                 history_table[move.from_square][move.to_square] += depth # Increment score (higher depth cutoffs are better)
+                 # Optional: Add decay mechanism over time or when scores get too high
+
 
         if value > best_value:
             best_value = value
@@ -284,96 +339,32 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
 
         alpha = max(alpha, best_value)
         if alpha >= beta:
+            # Alpha-Beta Pruning occurs here. The current move caused the cutoff.
+            # The update to killer/history for this move is done above.
             break # Beta cutoff
 
-    # --- Transposition Table Store ---
-    # Only store in TT if the search was not terminated by time
-    # (If we reached here, it means the loop completed or broke due to pruning, not time)
-    flag = TT_EXACT
-    if best_value <= original_alpha:
-        flag = TT_UPPERBOUND
-    elif best_value >= beta:
-        flag = TT_LOWERBOUND
 
-    transposition_table[board_hash] = {
-        'value': best_value,
-        'depth': depth,
-        'flag': flag,
-        'best_move': best_move
-    }
+    # --- Transposition Table Store ---
+    # ... (Keep existing TT store logic using best_value, depth, flag, best_move) ...
+    # Only store if the search was not terminated by time
+    if time.time() - start_time <= time_limit_sec: # Check time again before storing
+        flag = TT_EXACT
+        # Compare best_value to alpha and beta *passed into* this negamax call
+        if best_value <= original_alpha: # original_alpha is the alpha passed in
+            flag = TT_UPPERBOUND
+        elif best_value >= beta: # beta is the beta passed in
+            flag = TT_LOWERBOUND
+
+        transposition_table[board_hash] = {
+            'value': best_value,
+            'depth': depth,
+            'flag': flag,
+            'best_move': best_move
+        }
+
     # --- End Transposition Table Store ---
 
     return best_value, best_move
-
-
-
-def find_best_move_iterative_deepening_tt_book(board, max_depth, time_limit_sec):
-    """
-    Finds the best move using iterative deepening with a time limit,
-    transposition table, and opening book.
-
-    Args:
-        board: The starting chess board state.
-        max_depth: The maximum depth to search if time allows.
-        time_limit_sec: The maximum time allowed for the search in seconds.
-
-    Returns:
-        The best move found within the time limit or from the opening book.
-    """
-    # --- Opening Book Lookup ---
-    if opening_book:
-        try:
-            # Look up the current position in the opening book
-            # weighted_choice() picks a move based on its weight in the book
-            book_move_entry = opening_book.weighted_choice(board)
-            if book_move_entry:
-                book_move = book_move_entry.move
-                print(f"Found book move: {book_move}")
-                return book_move # Return the book move immediately
-        except IndexError:
-            # Position not found in the book or no moves available
-            pass
-        except Exception as e:
-            print(f"Error reading opening book: {e}")
-            pass # Continue to search if book reading fails
-    # --- End Opening Book Lookup ---
-
-    start_time = time.time()
-    best_move_so_far = None
-    principal_variation = []
-
-    color = 1 if board.turn == chess.WHITE else -1
-
-    for depth in range(1, max_depth + 1):
-        if time.time() - start_time > time_limit_sec:
-            print(f"Time limit reached at depth {depth - 1}.")
-            break
-
-        time_left = time_limit_sec - time.time() - start_time
-        # Perform a depth-limited search using the transposition table
-        # Pass a copy of the board to avoid modifying the original during search
-        current_value, current_best_move = negamax(board.copy(), depth, -INF, INF, color, start_time, time_left, principal_variation)
-        print(start_time)
-        print(time_left)
-
-        if time.time() - start_time <= time_limit_sec:
-            best_move_so_far = current_best_move
-            if best_move_so_far:
-                 principal_variation = [best_move_so_far]
-
-            print(f"Depth {depth} completed. Best move: {best_move_so_far}, Value: {current_value}")
-        else:
-            print(f"Depth {depth} did not complete within the time limit.")
-            break
-
-    # If no move was found (e.g., very short time limit and no book move),
-    # fall back to a legal move to avoid crashing. This is a safeguard.
-    if best_move_so_far is None and board.legal_moves:
-        print("Warning: No best move found, returning a random legal move.")
-        return random.choice(list(board.legal_moves))
-
-    return best_move_so_far
-
 
 def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_sec):
     """
@@ -501,8 +492,13 @@ def game_end(board):
 # Example usage:
 # Assuming 'initial_board' is a chess.Board object
 if __name__ == "__main__":
-    board = chess.Board()
-
+    board = chess.Board(None)
+    board.set_piece_at(chess.B6, chess.Piece(chess.KING, chess.WHITE))
+    board.set_piece_at(chess.D6, chess.Piece(chess.KING, chess.BLACK))
+    board.set_piece_at(chess.B5, chess.Piece(chess.PAWN, chess.WHITE))
+    board.set_piece_at(chess.D3, chess.Piece(chess.PAWN, chess.BLACK))
+    board.set_piece_at(chess.G4, chess.Piece(chess.QUEEN, chess.BLACK))
+    board.turn = chess.BLACK
     legal_moves = []
     while True:
         tic = time.perf_counter()
@@ -516,8 +512,8 @@ if __name__ == "__main__":
         if game_end(board):
             break
 
-        tic = time.perf_counter()
-        best_move = find_best_move_iterative_deepening_tt_book_aw(board, 7, 10)
+        """tic = time.perf_counter()
+        best_move = input("move: ")
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)
@@ -525,6 +521,6 @@ if __name__ == "__main__":
         print(board)
         print("")
         if game_end(board):
-            break
+            break"""
 
     print(board.outcome())

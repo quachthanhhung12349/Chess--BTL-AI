@@ -23,7 +23,7 @@ class Game:
         self.game = ChessGame()
         self.board = self.game.get_board()
         self.game_menu = GameMenu()
-        self.game_state = MAIN_MENU
+        self.game_state = MAIN_MENU_WITH_BUTTONS
         self.game_mode = None
 
         self.running = True
@@ -343,15 +343,15 @@ class Game:
                 if self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]:
                     self.handle_player_click(event)
 
-                # elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
-                #     """AI random"""
-                #     legal_moves = list(self.board.legal_moves)
-                #     if legal_moves:
-                #         import random
-                #         move = random.choice(legal_moves)
-                #         self.game.push_move(move)
-                #         self.board = self.game.get_board()
-                #         self.current_player = not self.current_player  # Chuyển lượt
+                elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
+                     """AI random"""
+                     legal_moves = list(self.board.legal_moves)
+                     if legal_moves:
+                         import random
+                         move = random.choice(legal_moves)
+                         self.game.push_move(move)
+                         self.board = self.game.get_board()
+                         self.current_player = not self.current_player  # Chuyển lượt
             #         """AI minimax"""
             #         _, best_move = minimax(self.board, depth=3, alpha=float('-inf'), beta=float('inf'), is_maximizing=True)
             #         if best_move:
