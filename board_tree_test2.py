@@ -172,7 +172,6 @@ def order_moves(board, current_depth, principal_variation=None, hash_move=None):
     return ordered_moves_unique
 
 
-
 QS_MAX_DEPTH = 0
 # Assuming quiescence_search is implemented as previously discussed
 # (It will also need to accept start_time and time_limit_sec)
@@ -227,6 +226,17 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limi
 
     return best_value, best_move # Return best value found in QS
 
+def calculate_lmr_reduction(depth, move_index):
+    # Simple example: Reduction increases with move index and depth
+    reduction = 0
+    if depth >= 3 and move_index >= 3: # Apply LMR from a certain depth and move index
+        reduction = 1
+        if depth >= 4 and move_index >= 5:
+            reduction = 2
+        # More complex formulas involve logarithms or tables
+
+    # Ensure reduction doesn't make depth negative
+    return max(0, reduction)
 
 
 def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, principal_variation=None):
@@ -299,50 +309,105 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
     best_move = None
     original_alpha = alpha # Store original alpha for TT flag determination
 
-    for move in move_order:
+    for move_index, move in enumerate(move_order):
         # --- Time Check ---
         if time.time() - start_time > time_limit_sec:
-            return None, None
+             return None, None
+        # --- End Time Check ---
 
         board.push(move)
-        # print(board) # Optional: Keep for debugging if needed
-        # print("")
 
-        # Recursive call to negamax
-        # Pass -beta, -alpha and -color
-        value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, time_limit_sec, principal_variation)
-        board.pop()
+        # --- Principal Variation Search (PVS) and Late Move Reductions (LMR) ---
+        should_do_full_depth_search = False
+        current_search_depth = depth - 1
 
-        # --- Handle Time Termination ---
-        if value is None:
-            return None, None # Propagate the termination signal
+        # Condition for applying LMR (e.g., not the first move, and sufficient depth)
+        apply_lmr = (move_index > 0 and depth >= 3) # Simple condition
 
-        # --- Negate the result ---
-        # The recursive call returns the value from the opponent's perspective.
-        # Negate it to get the value from the current player's perspective.
-        value = -value
+        if apply_lmr:
+            reduction = calculate_lmr_reduction(depth, move_index)
+            current_search_depth = depth - 1 - reduction # Reduced depth
 
-        # --- Update Best Move and Alpha ---
+            # Ensure reduced depth is at least 0
+            current_search_depth = max(0, current_search_depth)
+
+            # --- Null Window Search with Reduced Depth ---
+            # Only do null window if reduced depth is > 0. If reduced depth is 0,
+            # it will go directly to quiescence search.
+            if current_search_depth > 0:
+                 # Perform a null window search [beta - 1, beta]
+                 value, _ = negamax(board, current_search_depth, -beta, -(alpha + 1), -color, start_time, time_limit_sec, principal_variation) # Note: alpha + 1 for null window
+
+                 # --- Handle Time Termination ---
+                 if value is None:
+                      board.pop() # Unmake before returning on time out
+                      return None, None
+                 # --- End Time Termination Handling ---
+                 value = -value # Negate the value from the recursive call
+                 # If the null window search failed high (value >= beta),
+                 # it means the move might be better than expected.
+                 # We need to re-search with a full window and full depth.
+                 if value > alpha: # Check against the original alpha
+                      should_do_full_depth_search = True # Flag for a full depth re-search
+                      print(f"LMR Fail High: Re-searching move {move} at depth {depth}") # Optional: log LMR failures
+            else:
+                 # If reduced depth is 0, we don't do a recursive call here.
+                 # A full depth search (which will go to QS) is needed.
+                 should_do_full_depth_search = True # Flag for a full depth search
+
+
+        # --- Full Depth Search (or Re-search after LMR failure) ---
+        # This branch is executed for the first move, or if LMR was not applied,
+        # or if the reduced-depth null window search failed high.
+        if not apply_lmr or should_do_full_depth_search:
+             # Determine the window for the full depth search/re-search
+             # For the first move, it's the full (alpha, beta) window.
+             # For a re-search after LMR failure, it's still the full (alpha, beta) window.
+             # If LMR wasn't applied, it's the full (alpha, beta) window.
+
+             # The window for the recursive call is always [-beta, -alpha] from the opponent's perspective.
+             # The value is negated after the call.
+
+             value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, time_limit_sec, principal_variation)
+             
+
+             # --- Handle Time Termination ---
+             if value is None:
+                  board.pop() # Unmake before returning on time out
+                  return None, None
+             value = -value # Negate value
+             # --- End Time Termination Handling ---
+
+
+        board.pop() # Unmake the move
+
+        # --- Update best value and best move ---
         if value > best_value:
             best_value = value
             best_move = move
 
         # --- Alpha-Beta Pruning ---
         alpha = max(alpha, best_value)
-        if alpha >= beta:
-             # Beta Cutoff: This move is too good, the opponent won't allow this line.
-             # Update Killer/History Heuristics for the move that caused the cutoff
-             if not board.is_capture(move): # Only update for quiet moves
-                  # Update Killer Moves
-                  if 0 <= depth < MAX_SEARCH_DEPTH:
-                       if move not in killer_moves[depth]:
-                            killer_moves[depth].insert(0, move)
-                            if len(killer_moves[depth]) > KILLER_MOVES_COUNT:
-                                 killer_moves[depth].pop()
-                  # Update History Heuristic
-                  history_table[move.from_square][move.to_square] += depth * depth # Square depth for more impact
 
-             break # Prune remaining moves
+        # --- Update Killer and History Heuristics ---
+        # Update killer/history for the move if it caused a beta cutoff
+        # (value >= beta) and is a quiet move.
+        # The update logic is the same as before.
+        if value >= beta:
+            # This move caused a beta cutoff. Update Killer and History.
+            if not board.is_capture(move):
+                 # Update Killer Moves (using 'depth' of the current node)
+                 if 0 <= depth < MAX_SEARCH_DEPTH:
+                     if move not in killer_moves[depth]:
+                         killer_moves[depth].insert(0, move)
+                         if len(killer_moves[depth]) > KILLER_MOVES_COUNT:
+                             killer_moves[depth].pop()
+
+                 # Update History Heuristic (using the move's squares)
+                 history_table[move.from_square][move.to_square] += depth # Or another scoring method
+
+
+            break # Beta cutoff
 
     # --- Transposition Table Store ---
     if time.time() - start_time <= time_limit_sec: # Check time again before storing
