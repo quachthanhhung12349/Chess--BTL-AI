@@ -1,6 +1,7 @@
 import chess
 import time
 import evaluation_advanced
+import evaluation_simple
 import random
 import chess.polyglot # Import polyglot for opening book
 
@@ -79,7 +80,7 @@ def order_moves(board, principal_variation=None, hash_move=None):
 
     return ordered_moves_unique
 
-QS_MAX_DEPTH = 3
+QS_MAX_DEPTH = 2
 # Assuming quiescence_search is implemented as previously discussed
 # (It will also need to accept start_time and time_limit_sec)
 def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limit_sec):
