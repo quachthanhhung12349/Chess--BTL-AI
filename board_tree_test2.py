@@ -17,8 +17,8 @@ TT_LOWERBOUND = 1
 TT_UPPERBOUND = 2
 
 # Define the initial delta for aspiration windows
-ASPIRATION_WINDOW_DELTA = 10 # Centipawns is a common unit
-ASPIRATION_WINDOW_DELTA_AFTER = [25, 50, 100, INF]
+ASPIRATION_WINDOW_DELTA = 50 # Centipawns is a common unit
+ASPIRATION_WINDOW_DELTA_AFTER = [100, INF]
 # Transposition Table (using a dictionary for simplicity)
 transposition_table = {}
 
@@ -47,9 +47,9 @@ def load_opening_book(book_path):
     global opening_book
     try:
         opening_book = chess.polyglot.open_reader(book_path)
-        print(f"Opening book loaded from {book_path}")
+        print("Opening book loaded from {book_path}")
     except Exception as e:
-        print(f"Could not load opening book from {book_path}: {e}")
+        print("Could not load opening book from {book_path}: {e}")
         opening_book = None # Ensure book is None if loading fails
 
 
@@ -58,11 +58,11 @@ def load_opening_book(book_path):
 
 
 PIECE_VALUES = {
-    chess.PAWN: 100,
-    chess.KNIGHT: 300,
-    chess.BISHOP: 320, # Bishops are often slightly more valuable than knights
-    chess.ROOK: 500,
-    chess.QUEEN: 900,
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3.2, # Bishops are often slightly more valuable than knights
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
     chess.KING: 20000 # King's value is high, but not typically used in material count for evaluation
 }
 
@@ -172,16 +172,17 @@ def order_moves(board, current_depth, principal_variation=None, hash_move=None):
     return ordered_moves_unique
 
 
-QS_MAX_DEPTH = 0
+cnt = 0
+QS_MAX_DEPTH = 2
 # Assuming quiescence_search is implemented as previously discussed
-# (It will also need to accept start_time and time_limit_sec)
-def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limit_sec):
+# (It will also need to accept start_time and stop_time)
+def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time):
     """
     Performs a limited depth search focusing on noisy positions (captures, checks).
     Includes time checks.
     """
     # --- Time Check ---
-    if time.time() - start_time > time_limit_sec:
+    if time.time() > stop_time:
         return None, None # Signal termination due to time
     # --- End Time Check ---
 
@@ -206,11 +207,11 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limi
     for move in noisy_moves:
         board.push(move)
         # Recursive call to quiescence search with time parameters
-        value, _ = quiescence_search(board, -beta, -alpha, -color, qs_depth - 1, start_time, time_limit_sec)
+        value, _ = quiescence_search(board, -beta, -alpha, -color, qs_depth - 1, start_time, stop_time)
         board.pop()
 
         # --- Handle Time Termination from recursive call ---
-        if value is None:
+        if _ is None and value is None:
              return None, None # Propagate the termination signal
         # --- End Time Termination Handling ---
 
@@ -233,21 +234,36 @@ def calculate_lmr_reduction(depth, move_index):
         reduction = 1
         if depth >= 4 and move_index >= 5:
             reduction = 2
+            if depth >= 6 and move_index >= 10:
+                reduction = 3
+                if depth >= 8 and move_index >= 15:
+                    reduction = 4
+                    if depth >= 10 and move_index >= 20:
+                        reduction = 5
         # More complex formulas involve logarithms or tables
 
     # Ensure reduction doesn't make depth negative
     return max(0, reduction)
 
+FUTILITY_MARGINS = [0, 200, 300] # Margins for depths 0, 1, 2 (adjust as needed)
 
-def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, principal_variation=None):
+NMR_MIN_DEPTH = 3 # Minimum remaining depth to apply NMR
+NMR_REDUCTION = 2 # Depth reduction for the null move search
+
+max_depth_current = 0
+def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_variation=None):
     """
     Negamax implementation with Alpha-Beta, Transposition Table, Time Control,
     and updates for Killer/History heuristics.
     """
+    global cnt, max_depth_current
     # --- Time Check ---
-    if time.time() - start_time > time_limit_sec:
+    if time.time() > stop_time:
         return None, None # Signal termination due to time
 
+    if max_depth_current - 1 == depth:
+        cnt += 1
+        #print(cnt)
     # --- Check for Immediate Game Over ---
     # Check this BEFORE transposition table lookup or depth check for terminal nodes
     if board.is_game_over(claim_draw=True): # claim_draw=True includes 50-move, 3-fold rep
@@ -260,7 +276,6 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
     # --- End Immediate Game Over Check ---
 
     board_hash = chess.polyglot.zobrist_hash(board)
-
     # --- Transposition Table Lookup ---
     # (Keep existing TT lookup logic)
     if board_hash in transposition_table:
@@ -295,9 +310,80 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
         # If depth is 0 and we already know game isn't over (from check above),
         # go to quiescence search.
         # Quiescence search should return the score relative to the current player.
-        value, _ = quiescence_search(board, alpha, beta, color, QS_MAX_DEPTH, start_time, time_limit_sec)
-        if value is None: return None, None # Handle timeout from QS
+        value, _ = quiescence_search(board, alpha, beta, color, QS_MAX_DEPTH, start_time, stop_time)
+        if value is None and _ is None: return None, None # Handle timeout from QS
         return value, None
+    
+    # --- Null Move Pruning ---
+    # Conditions for applying NMR:
+    # 1. Sufficient remaining depth.
+    # 2. Not in check (Null Move is unsound when in check).
+    # 3. Not in an endgame (NMR can be unsound in positions with few pieces due to zugzwang).
+    #    A simple endgame check could be based on the total number of pieces or material.
+    # 4. Sufficient material (e.g., not just a lone king).
+
+    # A very simple endgame check: Check if total material is below a threshold.
+    # This requires a material count function or iterating over the board.
+    # For simplicity in this example, we'll skip the endgame check, but it's important
+    # in a real engine.
+
+    if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
+        
+        # Make a null move (toggle turn, handle potential en passant square cleanup)
+        original_turn = board.turn
+        original_ep_square = board.ep_square
+        board.turn = not board.turn
+        board.ep_square = None # En passant target is cleared after a null move
+        # Perform a reduced-depth search after the null move
+        # Use a narrow window [-beta, -beta + 1] for the null move probe
+        # Value is from the perspective of the player *after* the null move (the opponent)
+        null_move_value, _ = negamax(
+            board,
+            depth - NMR_REDUCTION - 1, # Subtract reduction and 1 ply for the null move
+            -beta,
+            -beta + 1, # Null window
+            -color, # Opponent's turn
+            start_time,
+            stop_time,
+            principal_variation # Pass PV (though its usefulness in null move is debatable)
+        )
+        # Unmake the null move
+        board.turn = original_turn
+        board.ep_square = original_ep_square
+
+        # --- Handle Time Termination from null move search ---
+        if null_move_value is None:
+            return None, None # Propagate termination
+        # --- End Time Termination Handling ---
+
+        # If the null move search resulted in a value >= beta (for the opponent),
+        # it means the opponent can't improve the position even with an extra move.
+        # This position is likely very good for the current player, so prune.
+        # The value from the null move search is from the opponent's perspective,
+        # so if null_move_value >= beta, it means the value for the current player is <= -beta.
+        # The cutoff condition is effectively if -null_move_value >= beta.
+        
+        if -null_move_value >= beta and cnt > 1:
+             #print("Null Move Pruning: {null_move_value} >= {beta} (depth {depth})")
+             # Null move pruning allows a beta cutoff. Return beta as the value.
+             return beta, None # Return beta and no specific move
+
+    # --- End Null Move Pruning ---
+    
+        # --- Futility Pruning ---
+    # Only apply at shallow depths and if not in check (checks introduce complexity)
+    # And if the alpha-beta window is not indicating a high-scoring node already
+    if depth < len(FUTILITY_MARGINS) and not board.is_check():
+         # Calculate the static evaluation from the current player's perspective
+         static_eval = evaluation_advanced.evaluate(board) * color
+         margin = FUTILITY_MARGINS[depth]
+
+         # If static eval + margin is still less than alpha, prune
+         if static_eval + margin <= alpha and cnt > 1:
+             # Return alpha (or alpha + 1) to signal that this branch is not better
+             # than the current best found so far.
+             # Using alpha is a common way to implement this cutoff.
+             return alpha, None # Return alpha and no specific move"""
 
     # --- Get hash move for move ordering ---
     hash_move = transposition_table.get(board_hash, {}).get('best_move')
@@ -310,8 +396,9 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
     original_alpha = alpha # Store original alpha for TT flag determination
 
     for move_index, move in enumerate(move_order):
+        
         # --- Time Check ---
-        if time.time() - start_time > time_limit_sec:
+        if time.time() > stop_time:
              return None, None
         # --- End Time Check ---
 
@@ -336,7 +423,7 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
             # it will go directly to quiescence search.
             if current_search_depth > 0:
                  # Perform a null window search [beta - 1, beta]
-                 value, _ = negamax(board, current_search_depth, -beta, -(alpha + 1), -color, start_time, time_limit_sec, principal_variation) # Note: alpha + 1 for null window
+                 value, _ = negamax(board, current_search_depth, -beta, -(alpha + 1), -color, start_time, stop_time, principal_variation) # Note: alpha + 1 for null window
 
                  # --- Handle Time Termination ---
                  if value is None:
@@ -349,7 +436,7 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
                  # We need to re-search with a full window and full depth.
                  if value > alpha: # Check against the original alpha
                       should_do_full_depth_search = True # Flag for a full depth re-search
-                      print(f"LMR Fail High: Re-searching move {move} at depth {depth}") # Optional: log LMR failures
+                      #print("LMR Fail High: Re-searching move {move} at depth {depth}") # Optional: log LMR failures
             else:
                  # If reduced depth is 0, we don't do a recursive call here.
                  # A full depth search (which will go to QS) is needed.
@@ -368,11 +455,11 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
              # The window for the recursive call is always [-beta, -alpha] from the opponent's perspective.
              # The value is negated after the call.
 
-             value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, time_limit_sec, principal_variation)
+             value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, stop_time, principal_variation)
              
 
              # --- Handle Time Termination ---
-             if value is None:
+             if value is None and _ is None:
                   board.pop() # Unmake before returning on time out
                   return None, None
              value = -value # Negate value
@@ -385,6 +472,8 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
         if value > best_value:
             best_value = value
             best_move = move
+        """if (depth == max_depth_current):
+            print(move, value)"""
 
         # --- Alpha-Beta Pruning ---
         alpha = max(alpha, best_value)
@@ -408,9 +497,9 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
 
 
             break # Beta cutoff
-
+    #if (depth == max_depth_current): print("")
     # --- Transposition Table Store ---
-    if time.time() - start_time <= time_limit_sec: # Check time again before storing
+    if time.time() - start_time <= stop_time: # Check time again before storing
         flag = TT_EXACT
         if best_value <= original_alpha: # Failed low (didn't improve alpha)
             flag = TT_UPPERBOUND
@@ -433,37 +522,46 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
 
     return best_value, best_move
 
-def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_sec):
+def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
     """
     Finds the best move using iterative deepening with a time limit,
     transposition table, opening book, and aspiration windows.
     """
     # --- Opening Book Lookup ---
-    global current_best_move, search_value
+    global current_best_move, search_value, cnt, max_depth_current
+
+    current_best_move = None
+    search_value = None
+    cnt = 0
+    max_depth_current = 0
+
     if opening_book:
         try:
             book_move_entry = opening_book.weighted_choice(board)
             if book_move_entry:
                 book_move = book_move_entry.move
-                print(f"Found book move: {book_move}")
+                print("Found book move: {book_move}")
                 return book_move
         except (IndexError, Exception) as e:
-            # print(f"Error or position not in book: {e}") # Optional: log book errors
+            # print("Error or position not in book: {e}") # Optional: log book errors
             pass  # Continue to search if book fails
     # --- End Opening Book Lookup ---
 
     start_time = time.time()
+    stop_time = start_time + stop_time
+
     best_move_so_far = None
     # Store the score from the previous depth for aspiration windows
     previous_depth_score = 0  # Initialize to 0 or a reasonable default
     principal_variation = []
-
     color = 1 if board.turn == chess.WHITE else -1
 
     for depth in range(1, max_depth + 1):
+        cnt = 0
+        max_depth_current = depth
         # Check if time is running out before starting a new depth
-        if time.time() - start_time > time_limit_sec:
-            print(f"Time limit reached at depth {depth - 1}.")
+        if time.time() > stop_time:
+            print("Time limit reached at depth {depth - 1}.")
             break
 
         # --- Aspiration Window Logic ---
@@ -482,15 +580,15 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_s
 
         # Loop for potential re-searches
         for asp_window_level in ASPIRATION_WINDOW_DELTA_AFTER:
-            time_left = time_limit_sec - (time.time() - start_time)
+            time_left = stop_time - (time.time() - start_time)
             # Perform a depth-limited search with the current alpha-beta window
-            search_value, current_best_move = negamax(board.copy(), depth, current_alpha, current_beta, color, start_time, time_left,
+            search_value, current_best_move = negamax(board.copy(), depth, current_alpha, current_beta, color, start_time, stop_time,
                                                       principal_variation)
             #print(start_time)
             #print(time_left)
 
             # Check for timeout during the search
-            if time.time() - start_time > time_limit_sec or search_value is None:
+            if time.time() > stop_time or search_value is None:
                 print(f"Depth {depth} search timed out.")
                 # If a move was found in a previous, completed depth, return it.
                 # Otherwise, the function will return None and the fallback handles it.
@@ -500,18 +598,18 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_s
             if search_value < current_alpha:
                 # Fail low: The true value is <= the lower bound of the window.
                 # The window was too high. Re-search with a wider window
-                print(
-                    f"Depth {depth} Fail Low (Value: {search_value}, Window: [{current_alpha}, {current_beta}]). Re-searching.")
+                #print(f"Depth {depth} Fail Low (Value: {search_value}, Window: [{current_alpha}, {current_beta}]). Re-searching.")
                 current_beta = search_value + asp_window_level
                 current_alpha = search_value - asp_window_level
+                cnt = 0
                 # The next iteration of the while loop will perform the re-search
             elif search_value > current_beta:
                 # Fail high: The true value is >= the upper bound of the window.
                 # The window was too low. Re-search with a wider window
-                print(
-                    f"Depth {depth} Fail High (Value: {search_value}, Window: [{current_alpha}, {current_beta}]). Re-searching.")
+                #print(f"Depth {depth} Fail High (Value: {search_value}, Window: [{current_alpha}, {current_beta}]). Re-searching.")
                 current_beta = search_value + asp_window_level
                 current_alpha = search_value - asp_window_level
+                cnt = 0
                 # The next iteration of the while loop will perform the re-search
             else:
                 # Success: The search value is within the aspiration window. No re-search needed.
@@ -521,7 +619,7 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, time_limit_s
 
         # If the search for this depth completed within the time limit (checked above)
         # and the search was successful (not timed out)
-        if time.time() - start_time <= time_limit_sec and current_best_move is not None:
+        if time.time() - start_time <= stop_time and current_best_move is not None:
             best_move_so_far = current_best_move
             previous_depth_score = search_value  # Store the value for the next iteration's window
             if best_move_so_far:
@@ -560,9 +658,12 @@ def game_end(board):
 # Assuming 'initial_board' is a chess.Board object
 if __name__ == "__main__":
     board = chess.Board()
+    #board.push_san("d2d4")
+    #board.set_fen("rnb1kbnr/pp1p1ppp/2p5/4q3/3PP3/2N5/PPP2PPP/R1BQKB1R b KQkq - 0 1")
+
     while True:
         tic = time.perf_counter()
-        best_move = find_best_move_iterative_deepening_tt_book_aw(board, 15, 10)
+        best_move = find_best_move_iterative_deepening_tt_book_aw(board, 20, 10)
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)
