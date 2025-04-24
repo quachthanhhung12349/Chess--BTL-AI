@@ -1,11 +1,21 @@
 import chess
+import chess.engine
 import time
 import evaluation_simple
 import evaluation_advanced
 import random
 import chess.polyglot # Import polyglot for opening book
 import sys
+import stockfish
+import os
+import asyncio
 
+script_dir = os.path.dirname(__file__)
+
+OPENING_BOOK_PATH = os.path.join(script_dir, "Data/Perfect2023.bin") # Update this path to your opening book file
+# Define the path to your opening book file
+
+STOCKFISH_PATH = os.path.join(script_dir, "stockfish/stockfish-ubuntu-x86-64-avx2")
 sys.setrecursionlimit(10000) # Increase recursion limit for deep searches
 
 # Define infinity
@@ -35,9 +45,7 @@ killer_moves = [[None for _ in range(KILLER_MOVES_COUNT)] for _ in range(MAX_SEA
 history_table = [[0 for _ in range(64)] for _ in range(64)]
 
 
-# Define the path to your opening book file
-# Make sure you have a Polyglot (.bin) opening book file
-OPENING_BOOK_PATH = "/home/linux-mint-cb303/Desktop/UET/HK2 2024/AI/Chess--BTL-AI-/Perfect2023.bin" # <--- Update this path
+
 
 # Global variable to hold the loaded opening book
 opening_book = None
@@ -327,7 +335,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
     # For simplicity in this example, we'll skip the endgame check, but it's important
     # in a real engine.
 
-    if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
+    """if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
         
         # Make a null move (toggle turn, handle potential en passant square cleanup)
         original_turn = board.turn
@@ -656,10 +664,30 @@ def game_end(board):
 
 # Example usage:
 # Assuming 'initial_board' is a chess.Board object
-if __name__ == "__main__":
+async def main():
+    
     board = chess.Board()
+    if not os.path.exists(STOCKFISH_PATH):
+        print(f"Error: Stockfish executable not found at '{STOCKFISH_PATH}'")
+        print("Please download Stockfish and update the STOCKFISH_PATH variable.")
+        exit()
     #board.push_san("d2d4")
     #board.set_fen("rnb1kbnr/pp1p1ppp/2p5/4q3/3PP3/2N5/PPP2PPP/R1BQKB1R b KQkq - 0 1")
+
+    engine = None # Initialize engine variable to None
+    try:
+        # This starts the Stockfish process and connects to it
+        print(f"Starting Stockfish engine from: {STOCKFISH_PATH}")
+        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+        print("Stockfish engine started successfully.")
+    except FileNotFoundError:
+        print(f"Error: Could not find Stockfish executable at '{STOCKFISH_PATH}'")
+        print("Please check the path and try again.")
+        exit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        exit()
+
 
     while True:
         tic = time.perf_counter()
@@ -672,7 +700,24 @@ if __name__ == "__main__":
         print("")
         if game_end(board):
             break
+        
+        if(engine):
+            limit = chess.engine.Limit(depth=5) # Think to depth 15
+            
+            print(f"\nAsking Stockfish for the best move with limit: {limit}")
+            result = engine.play(board, limit)
 
+            best_move = result.move
+            ponder_move = result.ponder
+
+            print(f"\nStockfish's Best Move: {best_move}")
+            if ponder_move:
+                print(f"Stockfish's Ponder Move: {ponder_move}")
+
+            board.push(best_move)
+
+            print("\nBoard after Stockfish's move:")
+            print(board)
         """legal_move_made = False
         while not legal_move_made:
             try:
@@ -685,3 +730,12 @@ if __name__ == "__main__":
                 print("Invalid move. Please try again.")"""
 
     print(board.outcome())
+    if engine:
+        print("\nShutting down Stockfish engine.")
+        engine.quit() # IMPORTANT: Always shut down the engine process
+        print("Engine shut down.")
+
+if __name__ == "__main__":
+    load_opening_book(OPENING_BOOK_PATH) # Load the opening book at the start
+    asyncio.run(main())
+    # Uncomment the line below to run the main function
