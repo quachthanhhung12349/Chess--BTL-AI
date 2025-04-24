@@ -125,4 +125,4 @@ if __name__ == "__main__":
     board1 = chess.Board()
     board1.push_san("e2e4")
 
-    print(evaluation(board1))
+    print(evaluate(board1))

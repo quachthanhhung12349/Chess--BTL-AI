@@ -80,7 +80,7 @@ def order_moves(board, principal_variation=None, hash_move=None):
 
     return ordered_moves_unique
 
-QS_MAX_DEPTH = 2
+QS_MAX_DEPTH = 3
 # Assuming quiescence_search is implemented as previously discussed
 # (It will also need to accept start_time and time_limit_sec)
 def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limit_sec):
