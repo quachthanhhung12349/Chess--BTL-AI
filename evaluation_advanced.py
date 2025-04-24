@@ -1,11 +1,15 @@
 
 import chess
 import chess.polyglot
+from chess.polyglot import zobrist_hash
+
 from constant import CENTER_SQUARES, EXTENDED_CENTER, FORK_BONUS, FORK_CHECK_BONUS, PIN_ABSOLUTE_BONUS
 from dynamic_PstAndPieceValue import get_piece_value, get_pst
 
 # Precomputed king attack bitboards
 BB_KING_ATTACKS = {s: chess.BB_KING_ATTACKS[s] for s in chess.SQUARES}
+
+zobrist_key = None
 
 # Cache dictionaries
 attack_cache = {}
@@ -17,28 +21,28 @@ piece_map_cache = {}
 
 def get_attacks(board, square):
     """Get attack squares for a piece, cached."""
-    cache_key = (chess.polyglot.zobrist_hash(board), square)
+    cache_key = (zobrist_key, square)
     if cache_key not in attack_cache:
         attack_cache[cache_key] = board.attacks(square)
     return attack_cache[cache_key]
 
 def get_attackers(board, square, color):
     """Get attackers of a square for a color, cached."""
-    cache_key = (chess.polyglot.zobrist_hash(board), square, color)
+    cache_key = (zobrist_key, square, color)
     if cache_key not in attackers_cache:
         attackers_cache[cache_key] = board.attackers(color, square)
     return attackers_cache[cache_key]
 
 def is_pinned(board, color, square):
     """Check if a piece is pinned, cached."""
-    cache_key = (chess.polyglot.zobrist_hash(board), color, square)
+    cache_key = (zobrist_key, color, square)
     if cache_key not in pin_cache:
         pin_cache[cache_key] = board.is_pinned(color, square)
     return pin_cache[cache_key]
 
 def get_open_files(board, white_pawns, black_pawns):
     """Get open files (no pawns), cached."""
-    cache_key = chess.polyglot.zobrist_hash(board)
+    cache_key = zobrist_key
     if cache_key not in open_files_cache:
         pawn_bitboard = (white_pawns | black_pawns).mask
         open_files_cache[cache_key] = [
@@ -48,7 +52,7 @@ def get_open_files(board, white_pawns, black_pawns):
 
 def get_semi_open_files(board, white_pawns, black_pawns):
     """Get semi-open files (pawns of one side only), cached."""
-    cache_key = chess.polyglot.zobrist_hash(board)
+    cache_key = zobrist_key
     if cache_key not in semi_open_files_cache:
         white_pawn_files = set(chess.square_file(p) for p in white_pawns)
         black_pawn_files = set(chess.square_file(p) for p in black_pawns)
@@ -60,13 +64,15 @@ def get_semi_open_files(board, white_pawns, black_pawns):
 
 def get_piece_map(board):
     """Get piece map, cached."""
-    cache_key = chess.polyglot.zobrist_hash(board)
+    cache_key = zobrist_key
     if cache_key not in piece_map_cache:
         piece_map_cache[cache_key] = board.piece_map()
     return piece_map_cache[cache_key]
 
 def evaluate(board):
+    global zobrist_key
     """Evaluate the board position, returning a score (positive favors White)."""
+    zobrist_key = chess.polyglot.zobrist_hash(board)
     # Clear caches to prevent memory leaks
     attack_cache.clear()
     attackers_cache.clear()
@@ -99,14 +105,20 @@ def evaluate(board):
     material = [0, 0]
     for square, piece in piece_map.items():
         material[piece.color] += get_piece_value(piece.piece_type, game_phase)
+
     total_score += material[chess.WHITE] - material[chess.BLACK]
 
     # Piece-Square Tables
     position_score = 0
     for square, piece in piece_map.items():
         score = get_pst(piece.piece_type, square, game_phase, piece.color == chess.WHITE)
+        #print(square, end=" ")
+        #print(piece, end=" ")
+        #print(score)
         position_score += score if piece.color == chess.WHITE else -score
+    #print(total_score)
     total_score += position_score
+    #print(total_score)
 
     # Pawn Structure
     pawn_structure_score = 0
@@ -142,7 +154,7 @@ def evaluate(board):
         if black_pawns_in_file > 1:
             pawn_structure_score -= 15 * (black_pawns_in_file - 1)
     total_score += pawn_structure_score
-
+    #print(total_score)
     # Combined Mobility, Center Control, and Space
     mobility_score = 0
     center_control_score = 0
@@ -177,7 +189,7 @@ def evaluate(board):
     mobility_weight = 4 * game_phase + 2 * (1 - game_phase)
     mobility_score = (white_mobility - black_mobility) * mobility_weight
     total_score += mobility_score + center_control_score + space_score
-
+    #print(total_score)
     # Outposts
     outpost_score = 0
     for square in chess.SQUARES:
@@ -336,4 +348,10 @@ def evaluate(board):
             if rank <= 1:
                 total_score -= 100
 
-    return total_score if board.turn == chess.WHITE else -total_score
+    return total_score
+
+if __name__ == "__main__":
+    board1 = chess.Board()
+    board1.push_san("e2e4")
+
+    print(evaluate(board1))

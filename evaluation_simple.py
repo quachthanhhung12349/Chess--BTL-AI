@@ -95,7 +95,7 @@ def endgame(board):
 
 
 
-def evaluation(board):
+def evaluate(board):
     material = [0, 0]
     is_endgame = endgame(board)
     for i in range(0, 64):
