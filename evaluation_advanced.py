@@ -1,14 +1,15 @@
 
 import chess
 import chess.polyglot
-import time
+from chess.polyglot import zobrist_hash
+
 from constant import CENTER_SQUARES, EXTENDED_CENTER, FORK_BONUS, FORK_CHECK_BONUS, PIN_ABSOLUTE_BONUS
 from dynamic_PstAndPieceValue import get_piece_value, get_pst
 
-zobrist_key = None
-
 # Precomputed king attack bitboards
 BB_KING_ATTACKS = {s: chess.BB_KING_ATTACKS[s] for s in chess.SQUARES}
+
+zobrist_key = None
 
 # Cache dictionaries
 attack_cache = {}
@@ -69,8 +70,9 @@ def get_piece_map(board):
     return piece_map_cache[cache_key]
 
 def evaluate(board):
-    zobrist_key = chess.polyglot.zobrist_hash(board)
+    global zobrist_key
     """Evaluate the board position, returning a score (positive favors White)."""
+    zobrist_key = chess.polyglot.zobrist_hash(board)
     # Clear caches to prevent memory leaks
     attack_cache.clear()
     attackers_cache.clear()
@@ -103,15 +105,18 @@ def evaluate(board):
     material = [0, 0]
     for square, piece in piece_map.items():
         material[piece.color] += get_piece_value(piece.piece_type, game_phase)
+
     total_score += material[chess.WHITE] - material[chess.BLACK]
-    #print(total_score)
 
     # Piece-Square Tables
     position_score = 0
     for square, piece in piece_map.items():
         score = get_pst(piece.piece_type, square, game_phase, piece.color == chess.WHITE)
-        #print(f"Piece: {piece}, Square: {square}, Score: {score}")
+        #print(square, end=" ")
+        #print(piece, end=" ")
+        #print(score)
         position_score += score if piece.color == chess.WHITE else -score
+    #print(total_score)
     total_score += position_score
     #print(total_score)
 
@@ -150,7 +155,6 @@ def evaluate(board):
             pawn_structure_score -= 15 * (black_pawns_in_file - 1)
     total_score += pawn_structure_score
     #print(total_score)
-
     # Combined Mobility, Center Control, and Space
     mobility_score = 0
     center_control_score = 0
@@ -186,7 +190,6 @@ def evaluate(board):
     mobility_score = (white_mobility - black_mobility) * mobility_weight
     total_score += mobility_score + center_control_score + space_score
     #print(total_score)
-
     # Outposts
     outpost_score = 0
     for square in chess.SQUARES:
@@ -222,7 +225,6 @@ def evaluate(board):
             if is_outpost:
                 outpost_score += 20 if piece.color == chess.WHITE else -20
     total_score += outpost_score
-    #print(total_score)
 
     # King Safety
     king_safety_score = 0
@@ -241,7 +243,6 @@ def evaluate(board):
     if black_king_file in semi_open_files['white']:
         king_safety_score += 20
     total_score += king_safety_score
-    #print(total_score)
 
     # Piece Coordination
     coordination_score = 0
@@ -262,13 +263,11 @@ def evaluate(board):
         if black_rooks >= 1 and black_queens >= 1:
             coordination_score -= 20
     total_score += coordination_score
-    #print(total_score)
 
     # Rook on Seventh
     white_rooks_on_seventh = len([r for r in board.pieces(chess.ROOK, chess.WHITE) if chess.square_rank(r) == 6])
     black_rooks_on_seventh = len([r for r in board.pieces(chess.ROOK, chess.BLACK) if chess.square_rank(r) == 1])
     total_score += (white_rooks_on_seventh - black_rooks_on_seventh) * 30
-    #print(total_score)
 
     # Threats (Forks and Pins)
     threats_score = 0
@@ -314,7 +313,9 @@ def evaluate(board):
             if board.king(chess.BLACK) in attacks:
                 attacked_pieces.append(board.king(chess.BLACK))
             if len(attacked_pieces) >= 2:
-                white_threats += FORK_CHECK_BONUS if board.king(chess.BLACK) in attacked_pieces else FORK_BONUS
+                # Adjusted bonus for forks involving the king
+                fork_bonus = 50 if board.king(chess.BLACK) in attacked_pieces else FORK_BONUS
+                white_threats += fork_bonus
         for piece_square in board.pieces(piece_type, chess.BLACK):
             attacks = get_attacks(board, piece_square)
             attacked_pieces = [
@@ -325,10 +326,11 @@ def evaluate(board):
             if board.king(chess.WHITE) in attacks:
                 attacked_pieces.append(board.king(chess.WHITE))
             if len(attacked_pieces) >= 2:
-                black_threats += FORK_CHECK_BONUS if board.king(chess.WHITE) in attacked_pieces else FORK_BONUS
-    threats_weight = 0.9 * game_phase + 0.5 * (1 - game_phase)
+                # Adjusted bonus for forks involving the king
+                fork_bonus = 50 if board.king(chess.WHITE) in attacked_pieces else FORK_BONUS
+                black_threats += fork_bonus
+    threats_weight = 0.8 * game_phase + 0.45 * (1 - game_phase)
     total_score += (white_threats - black_threats) * threats_weight
-    #print(total_score)
 
     # Endgame Adjustments
     if game_phase < 0.2:
@@ -345,16 +347,11 @@ def evaluate(board):
             rank = chess.square_rank(pawn)
             if rank <= 1:
                 total_score -= 100
-    #print(total_score)
 
     return total_score
 
 if __name__ == "__main__":
     board1 = chess.Board()
-    tic = time.perf_counter()
     board1.push_san("e2e4")
-    board1.push_san("e7e6")
 
     print(evaluate(board1))
-    toc = time.perf_counter()
-    print(toc - tic)

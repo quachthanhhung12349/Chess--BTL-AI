@@ -1,6 +1,7 @@
 import chess
 import time
 import evaluation_advanced
+import evaluation_simple
 import random
 import chess.polyglot
 import evaluation_advanced# Import polyglot for opening book
@@ -143,6 +144,11 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
         return None, None # Signal termination due to time
     # --- End Time Check ---
 
+        # Early termination for game-over conditions at any depth
+    if board.is_game_over():
+        if board.is_checkmate():
+            return -INF * color, None
+        return 0, None  # Stalemate or draw
 
     board_hash = chess.polyglot.zobrist_hash(board)
 
@@ -185,6 +191,11 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
     # --- Rest of Negamax (Move ordering, loop, recursive call, TT store) ---
     hash_move = transposition_table.get(board_hash, {}).get('best_move')
     move_order = order_moves(board, principal_variation, hash_move)
+
+    if not move_order:
+        if board.is_checkmate():
+            return -INF * color, None
+        return 0, None  # Stalemate or draw
 
     best_value = -INF
     best_move = None
@@ -375,7 +386,7 @@ if __name__ == "__main__":
     legal_moves = []
     while True:
         tic = time.perf_counter()
-        best_move = find_best_move(board, 10, 10)
+        best_move = find_best_move(board, 8, 10)
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)
@@ -386,7 +397,7 @@ if __name__ == "__main__":
             break
 
         tic = time.perf_counter()
-        best_move = find_best_move(board, 10, 10)
+        best_move = find_best_move(board, 8, 10)
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)

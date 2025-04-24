@@ -54,6 +54,23 @@ def draw_legal_moves(screen, legal_moves):
         rect = pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
         pygame.draw.rect(screen, color, rect)
 
+
+# New function to highlight AI moves
+def draw_ai_move(screen, from_square, to_square, duration_ms=500):
+    from_pos = chess_square_to_position(from_square)
+    to_pos = chess_square_to_position(to_square)
+
+    # Highlight the "from" square
+    from_rect = pygame.Rect(from_pos[1] * SQUARE_SIZE, from_pos[0] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
+    pygame.draw.rect(screen, (255, 215, 0), from_rect, 4)  # Gold border for "from" square
+
+    # Highlight the "to" square
+    to_rect = pygame.Rect(to_pos[1] * SQUARE_SIZE, to_pos[0] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
+    pygame.draw.rect(screen, (255, 165, 0), to_rect, 4)  # Orange border for "to" square
+
+    pygame.display.update()
+    pygame.time.delay(duration_ms)  # Show the highlight for 500ms
+
 # def draw_move_history(screen, move_history):
 #     font = pygame.font.SysFont('comicsans', 30)
 #     pygame.draw.rect(screen, (245, 245, 245), (WIDTH_BOARD + 5, WIDTH // 2 - 200, WIDTH - WIDTH_BOARD, WIDTH // 2))
@@ -114,7 +131,6 @@ class GameMenu():
     
     def show_blinking_text(self, surface):
         self.blinking_text.show_blinking_text(surface)
-
         self.settings_button.show_button(surface)
         if self.settings_popup_visible:
             self.display_settings_popup(surface)

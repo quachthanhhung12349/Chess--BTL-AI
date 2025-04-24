@@ -49,12 +49,23 @@ FORK_CHECK_BONUS = 80
 # Bonus for absolute pins (pinned piece cannot move)
 PIN_ABSOLUTE_BONUS = 80
 
+piece_names = {
+            chess.PAWN: "Pawn",
+            chess.KNIGHT: "Knight",
+            chess.BISHOP: "Bishop",
+            chess.ROOK: "Rook",
+            chess.QUEEN: "Queen",
+            chess.KING: "King",
+        }
+
 MAIN_MENU = "manin_menu"
 MAIN_MENU_WITH_BUTTONS = "main_menu_with_buttons"
 GAME_MODE = "game_mode"
 PVP_MODE = "pvp_mode"
 PVE_MODE = "pve_mode"
+COLOR_SELECTION = "color_selection"  # Added for PVE color selection
 AI_MATCHING_MODE = "ai_matching_mode"
+NO_TIMER = "unlimited_mode"
 
 BOARD_SIZE = 800
 GAME_MODE_MENU = "game_mode_menu"
