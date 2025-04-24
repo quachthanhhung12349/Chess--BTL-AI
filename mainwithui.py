@@ -104,7 +104,7 @@ class Game:
         self.game_start_time = pygame.time.get_ticks()
 
     def update_timer(self, dt):
-        if self.game_mode in [PVP_MODE, PVE_MODE] and self.game_mode != "NO_TIMER" and not self.game.is_game_over():
+        if self.game_mode in [PVP_MODE, PVE_MODE] and self.game_mode != NO_TIMER and not self.game.is_game_over():
             time_elapsed = dt / 1000.0  # Chuyển đổi milliseconds sang giây
             if self.current_player == chess.WHITE:
                 self.player1_time -= time_elapsed
@@ -137,7 +137,7 @@ class Game:
         current_y_black = (HEIGHT - BOARD_SIZE) // 2 + 150
         current_col_black = 0
         for i, piece in enumerate(self.captured_pieces_black):
-            if i > 0 and current_y_black > HEIGHT - 400 :
+            if i > 0 and current_y_black > HEIGHT - 100 :
                 current_y_black = (HEIGHT - BOARD_SIZE) // 2 + 150
                 current_col_black += 1
                 start_x_black -= 20  # vẽ ở cột tiếp theo
@@ -154,7 +154,7 @@ class Game:
         current_y_white = (HEIGHT - 200)
         current_col_white = 0
         for i, piece in enumerate(self.captured_pieces_white):
-            if i > 0 and current_y_white < 100:
+            if i > 0 and current_y_white < 100 - captured_piece_size:
                 current_y_white = (HEIGHT - 200)
                 current_col_white += 1
                 start_x_white += 20 # vẽ ở cột tiếp theo
@@ -274,7 +274,7 @@ class Game:
 
             if self.selected_square is None:
                 selected_piece = self.board.piece_at(square)
-                if selected_piece and selected_piece.color == self.board.turn and self.game_mode in [PVP_MODE, PVE_MODE,                                                                           "NO_TIMER"]:
+                if selected_piece and selected_piece.color == self.board.turn and self.game_mode in [PVP_MODE, PVE_MODE,NO_TIMER]:
                     self.selected_square = (row, col)
                     legal_moves = self.game.get_legal_moves()
                     self.legal_targets = [
@@ -294,7 +294,7 @@ class Game:
                 if piece and piece.piece_type == chess.PAWN and chess.square_rank(to_sq) in [0, 7]:
                     move_uci += "q"  # Phong hậu
 
-                if move_uci in self.game.get_legal_moves() and self.game_mode in [PVP_MODE, PVE_MODE, "NO_TIMER"]:
+                if move_uci in self.game.get_legal_moves() and self.game_mode in [PVP_MODE, PVE_MODE, NO_TIMER]:
                     # Kiểm tra xem có quân cờ nào bị ăn không
                     captured_piece = self.board.piece_at(to_sq)
                     if captured_piece:
@@ -306,9 +306,9 @@ class Game:
                     self.game.push_move(move_uci)
                     self.board = self.game.get_board()
                     print(f"After player move - New turn: {'White' if self.board.turn == chess.WHITE else 'Black'}")
-                    if self.current_player == chess.WHITE and self.game_mode != "NO_TIMER":
+                    if self.current_player == chess.WHITE and self.game_mode != NO_TIMER:
                         self.player1_time += self.increment
-                    elif self.current_player == chess.BLACK and self.game_mode != "NO_TIMER":
+                    elif self.current_player == chess.BLACK and self.game_mode != NO_TIMER:
                         self.player2_time += self.increment
                     self.current_player = not self.current_player
                     self.selected_square = None
@@ -365,7 +365,7 @@ class Game:
                         elif button.button_text == "Standard":
                             self.base_time = 1800  # 30p
                         elif button.button_text == "No Timer":
-                            self.game_mode = "NO_TIMER"
+                            self.game_mode = NO_TIMER
                             self.game_state = GAME_MODE
                             break
                         self.reset_timer()
@@ -430,7 +430,7 @@ class Game:
             #             self.board.push(best_move)
             #             self.current_player = not self.current_player # Chuyển lượt
             elif self.game_state == GAME_OVER_SCREEN:
-                if pygame.time.get_ticks() - self.game_over_time > 4000:
+                if pygame.time.get_ticks() - self.game_over_time > 3000:
                     if self.rematch_button and self.rematch_button.is_clicked(event):
                         print("Rematch button clicked!")
                         self.game_state = GAME_MODE
@@ -443,6 +443,8 @@ class Game:
                         self.legal_targets = []
                         self.game_over = False
                         self.game_result_text = ""
+                        self.captured_pieces_white=[]
+                        self.captured_pieces_black=[]
                     elif self.menu_button and self.menu_button.is_clicked(event):
                         self.game_state = MAIN_MENU
                         self.game.reset_game()
@@ -451,6 +453,8 @@ class Game:
                         self.legal_targets = []
                         self.game_over = False
                         self.game_result_text = ""
+                        self.captured_pieces_white = []
+                        self.captured_pieces_black = []
 
     def update(self, dt):
         if self.game_state == MAIN_MENU:
@@ -504,7 +508,7 @@ class Game:
                         self.current_player = not self.current_player
                         self.player_just_moved = False
 
-            if self.game_mode != "NO_TIMER":
+            if self.game_mode != NO_TIMER:
                 self.update_timer(dt)
                 if self.game.is_game_over() and not self.game_over:
                     self.handle_game_over()
