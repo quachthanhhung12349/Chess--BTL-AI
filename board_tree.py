@@ -81,7 +81,7 @@ def order_moves(board, principal_variation=None, hash_move=None):
 
     return ordered_moves_unique
 
-QS_MAX_DEPTH = 2
+QS_MAX_DEPTH = 0
 # Assuming quiescence_search is implemented as previously discussed
 # (It will also need to accept start_time and time_limit_sec)
 def quiescence_search(board, alpha, beta, color, qs_depth, start_time, time_limit_sec):
@@ -377,12 +377,7 @@ def game_end(board):
 # Assuming 'initial_board' is a chess.Board object
 if __name__ == "__main__":
     board = chess.Board()
-    board.push_san("e2e3")
-    board.push_san("e7e6")
-    board.push_san("f1c4")
-    board.push_san("f8c5")
-    board.push_san("c4e6")
-    board.push_san("c5e3")
+
     legal_moves = []
     while True:
         tic = time.perf_counter()

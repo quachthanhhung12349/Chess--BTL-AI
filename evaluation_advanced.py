@@ -1,4 +1,4 @@
-
+import time
 import chess
 import chess.polyglot
 from chess.polyglot import zobrist_hash
@@ -352,6 +352,9 @@ def evaluate(board):
 
 if __name__ == "__main__":
     board1 = chess.Board()
+    tic = time.perf_counter()
     board1.push_san("e2e4")
+    toc = time.perf_counter()
+    print(f"Time taken to make move: {toc - tic:0.8f} seconds")
 
     print(evaluate(board1))

@@ -237,123 +237,125 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
     # --- Time Check ---
     if time.time() - start_time > time_limit_sec:
         return None, None # Signal termination due to time
-    # --- End Time Check ---
+
+    # --- Check for Immediate Game Over ---
+    # Check this BEFORE transposition table lookup or depth check for terminal nodes
+    if board.is_game_over(claim_draw=True): # claim_draw=True includes 50-move, 3-fold rep
+        if board.is_checkmate():
+            # The player whose turn it IS is checkmated. This is the worst possible outcome.
+            return -INF, None
+        else:
+            # Any other draw condition (stalemate, repetition, 50-move, insufficient material)
+            return 0, None
+    # --- End Immediate Game Over Check ---
 
     board_hash = chess.polyglot.zobrist_hash(board)
 
     # --- Transposition Table Lookup ---
-    # ... (Keep existing TT lookup logic) ...
+    # (Keep existing TT lookup logic)
     if board_hash in transposition_table:
        entry = transposition_table[board_hash]
+       # Check if TT entry depth is sufficient ONLY IF the game isn't already over
+       # (The game over check above takes precedence over TT)
        if entry['depth'] >= depth:
-           tt_value = entry['value']
+            tt_value = entry['value']
+            # Be careful using TT values for checkmate/stalemate if not stored correctly
+            # The absolute -INF/0 values from the game over check are more reliable
 
-           if entry['flag'] == TT_EXACT:
-               return tt_value, entry.get('best_move')
-           elif entry['flag'] == TT_LOWERBOUND:
-               alpha = max(alpha, tt_value)
-           elif entry['flag'] == TT_UPPERBOUND:
-               beta = min(beta, tt_value)
+            if entry['flag'] == TT_EXACT:
+                # Ensure we don't return a TT score that contradicts a proven mate/draw
+                if tt_value == -INF or tt_value == 0: # Assuming TT stores absolute mate/draw scores correctly
+                     return tt_value, entry.get('best_move')
+                # Otherwise, proceed with caution or re-verify if needed
+                # For now, let's trust the TT if flag is EXACT and depth sufficient
+                return tt_value, entry.get('best_move')
 
-           if alpha >= beta:
-               return tt_value, entry.get('best_move')
+            elif entry['flag'] == TT_LOWERBOUND:
+                alpha = max(alpha, tt_value)
+            elif entry['flag'] == TT_UPPERBOUND:
+                beta = min(beta, tt_value)
 
-    # --- Base case ---
+            if alpha >= beta:
+                # Return the TT value that caused the cutoff
+                return tt_value, entry.get('best_move')
+
+
+    # --- Depth Limit Reached (Base case) ---
     if depth == 0:
-        # ... (Call quiescence_search with time parameters) ...
-        if board.is_game_over():
-             if board.is_checkmate():
-                 return -INF * color, None
-             elif board.is_stalemate():
-                  return 0, None
-        else:
-            value, _ = quiescence_search(board, alpha, beta, color, QS_MAX_DEPTH, start_time, time_limit_sec)
-            if value is None: return None, None
-            return value, None
-
+        # If depth is 0 and we already know game isn't over (from check above),
+        # go to quiescence search.
+        # Quiescence search should return the score relative to the current player.
+        value, _ = quiescence_search(board, alpha, beta, color, QS_MAX_DEPTH, start_time, time_limit_sec)
+        if value is None: return None, None # Handle timeout from QS
+        return value, None
 
     # --- Get hash move for move ordering ---
     hash_move = transposition_table.get(board_hash, {}).get('best_move')
 
     # --- Order moves using advanced heuristics ---
-    # Pass the current depth to order_moves for Killer Moves
     move_order = order_moves(board, depth, principal_variation, hash_move)
 
-    best_value = -INF
+    best_value = -INF # Start with the worst possible score
     best_move = None
-    original_alpha = alpha # Store original alpha for TT
+    original_alpha = alpha # Store original alpha for TT flag determination
 
     for move in move_order:
         # --- Time Check ---
         if time.time() - start_time > time_limit_sec:
-             return None, None
-        # --- End Time Check ---
+            return None, None
 
         board.push(move)
+        # print(board) # Optional: Keep for debugging if needed
+        # print("")
+
         # Recursive call to negamax
-        value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, time_limit_sec, principal_variation) # Pass principal_variation
+        # Pass -beta, -alpha and -color
+        value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, time_limit_sec, principal_variation)
         board.pop()
 
         # --- Handle Time Termination ---
         if value is None:
-             return None, None # Propagate the termination signal
-        # --- End Time Termination Handling ---
+            return None, None # Propagate the termination signal
 
-        value = -value # Negate value
+        # --- Negate the result ---
+        # The recursive call returns the value from the opponent's perspective.
+        # Negate it to get the value from the current player's perspective.
+        value = -value
 
-        # --- Update Killer and History heuristics on Beta Cutoff ---
-        # Check if this move caused a beta cutoff (value >= beta)
-        # and if it was a quiet move (not a capture)
-        # Note: The check `value >= beta` should use the `beta` value
-        # that was passed *into* the current negamax call.
-        # This logic happens *after* the recursive call and value negation.
-
-        # The condition `value >= beta` means the current move's value is at least beta,
-        # which would cause a cutoff in the parent node. This move is good.
-        # We also need to check if it caused a cutoff *in this node's loop*.
-        # A simpler check is: if the new alpha (max(original_alpha, value)) becomes >= beta,
-        # then the current move *might* be the one causing the cutoff.
-        # We update heuristics if the value is >= the *original* beta passed in.
-
-        if value >= beta:
-             # This move caused a beta cutoff. Update Killer and History.
-             if not board.is_capture(move): # Only update for quiet moves
-                 # Update Killer Moves
-                 if 0 <= depth < MAX_SEARCH_DEPTH:
-                     # Add the move to the killer table for this depth.
-                     # Simple replacement: if the table is full, shift entries.
-                     # More robust: check if the move is already there.
-                     if move not in killer_moves[depth]:
-                         killer_moves[depth].insert(0, move) # Add to the front
-                         if len(killer_moves[depth]) > KILLER_MOVES_COUNT:
-                             killer_moves[depth].pop() # Remove the oldest if over limit
-
-                 # Update History Heuristic
-                 history_table[move.from_square][move.to_square] += depth # Increment score (higher depth cutoffs are better)
-                 # Optional: Add decay mechanism over time or when scores get too high
-
-
+        # --- Update Best Move and Alpha ---
         if value > best_value:
             best_value = value
             best_move = move
 
+        # --- Alpha-Beta Pruning ---
         alpha = max(alpha, best_value)
         if alpha >= beta:
-            # Alpha-Beta Pruning occurs here. The current move caused the cutoff.
-            # The update to killer/history for this move is done above.
-            break # Beta cutoff
+             # Beta Cutoff: This move is too good, the opponent won't allow this line.
+             # Update Killer/History Heuristics for the move that caused the cutoff
+             if not board.is_capture(move): # Only update for quiet moves
+                  # Update Killer Moves
+                  if 0 <= depth < MAX_SEARCH_DEPTH:
+                       if move not in killer_moves[depth]:
+                            killer_moves[depth].insert(0, move)
+                            if len(killer_moves[depth]) > KILLER_MOVES_COUNT:
+                                 killer_moves[depth].pop()
+                  # Update History Heuristic
+                  history_table[move.from_square][move.to_square] += depth * depth # Square depth for more impact
 
+             break # Prune remaining moves
 
     # --- Transposition Table Store ---
-    # ... (Keep existing TT store logic using best_value, depth, flag, best_move) ...
-    # Only store if the search was not terminated by time
     if time.time() - start_time <= time_limit_sec: # Check time again before storing
         flag = TT_EXACT
-        # Compare best_value to alpha and beta *passed into* this negamax call
-        if best_value <= original_alpha: # original_alpha is the alpha passed in
+        if best_value <= original_alpha: # Failed low (didn't improve alpha)
             flag = TT_UPPERBOUND
-        elif best_value >= beta: # beta is the beta passed in
+        elif best_value >= beta: # Failed high (caused beta cutoff)
             flag = TT_LOWERBOUND
+
+        # Ensure we store meaningful values, especially for mates
+        # If best_value indicates a mate found at this depth, adjust score relative to ply
+        # (This helps prioritize faster mates, but is complex. Let's stick to INF for now)
+        # If best_value is -INF, it means we are getting mated.
 
         transposition_table[board_hash] = {
             'value': best_value,
@@ -362,7 +364,7 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit_sec, princi
             'best_move': best_move
         }
 
-    # --- End Transposition Table Store ---
+    # print(best_value, best_move) # Optional debug
 
     return best_value, best_move
 
@@ -492,17 +494,10 @@ def game_end(board):
 # Example usage:
 # Assuming 'initial_board' is a chess.Board object
 if __name__ == "__main__":
-    board = chess.Board(None)
-    board.set_piece_at(chess.B6, chess.Piece(chess.KING, chess.WHITE))
-    board.set_piece_at(chess.D6, chess.Piece(chess.KING, chess.BLACK))
-    board.set_piece_at(chess.B5, chess.Piece(chess.PAWN, chess.WHITE))
-    board.set_piece_at(chess.D3, chess.Piece(chess.PAWN, chess.BLACK))
-    board.set_piece_at(chess.G4, chess.Piece(chess.QUEEN, chess.BLACK))
-    board.turn = chess.BLACK
-    legal_moves = []
+    board = chess.Board()
     while True:
         tic = time.perf_counter()
-        best_move = find_best_move_iterative_deepening_tt_book_aw(board, 7, 10)
+        best_move = find_best_move_iterative_deepening_tt_book_aw(board, 15, 10)
         toc = time.perf_counter()
         print(toc - tic)
         print(best_move)
@@ -512,15 +507,15 @@ if __name__ == "__main__":
         if game_end(board):
             break
 
-        """tic = time.perf_counter()
-        best_move = input("move: ")
-        toc = time.perf_counter()
-        print(toc - tic)
-        print(best_move)
-        board.push_san(str(best_move))
-        print(board)
-        print("")
-        if game_end(board):
-            break"""
+        """legal_move_made = False
+        while not legal_move_made:
+            try:
+                move = input("Enter your move: ")
+                board.push_san(move)
+                print(board)
+                print("")
+                legal_move_made = True
+            except ValueError:
+                print("Invalid move. Please try again.")"""
 
     print(board.outcome())
