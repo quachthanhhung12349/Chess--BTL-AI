@@ -1,5 +1,5 @@
 import time
-from board_tree import find_best_move
+from board_tree import find_best_move_iterative_deepening_tt_book_aw
 from LogicChess import ChessGame
 from UI import *
 from constant import *
@@ -23,7 +23,7 @@ class Game:
         self.game = ChessGame()
         self.board = self.game.get_board()
         self.game_menu = GameMenu()
-        self.game_state = MAIN_MENU
+        self.game_state = MAIN_MENU_WITH_BUTTONS
         self.game_mode = None
 
         self.running = True
@@ -415,15 +415,15 @@ class Game:
                 if self.game_mode in [PVP_MODE, PVE_MODE, NO_TIMER]:
                     self.handle_player_click(event)
 
-                # elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
-                #     """AI random"""
-                #     legal_moves = list(self.board.legal_moves)
-                #     if legal_moves:
-                #         import random
-                #         move = random.choice(legal_moves)
-                #         self.game.push_move(move)
-                #         self.board = self.game.get_board()
-                #         self.current_player = not self.current_player  # Chuyển lượt
+                elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
+                     """AI random"""
+                     legal_moves = list(self.board.legal_moves)
+                     if legal_moves:
+                         import random
+                         move = random.choice(legal_moves)
+                         self.game.push_move(move)
+                         self.board = self.game.get_board()
+                         self.current_player = not self.current_player  # Chuyển lượt
             #         """AI minimax"""
             #         _, best_move = minimax(self.board, depth=3, alpha=float('-inf'), beta=float('inf'), is_maximizing=True)
             #         if best_move:
@@ -475,7 +475,7 @@ class Game:
                     depth = 8
                     time_limit_sec = 5
                     start_time = time.time()
-                    best_move = find_best_move(self.board, depth, time_limit_sec)
+                    best_move = find_best_move_iterative_deepening_tt_book_aw(self.board, depth, time_limit_sec)
                     elapsed_time = time.time() - start_time
                     print(f"AI move computed in {elapsed_time:.2f} seconds: {best_move}")
                     if best_move is None:

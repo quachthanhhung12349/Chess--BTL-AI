@@ -1,4 +1,4 @@
-
+import time
 import chess
 import chess.polyglot
 from chess.polyglot import zobrist_hash
@@ -68,6 +68,21 @@ def get_piece_map(board):
     if cache_key not in piece_map_cache:
         piece_map_cache[cache_key] = board.piece_map()
     return piece_map_cache[cache_key]
+
+def get_game_phase(board):
+    piece_map = get_piece_map(board)
+    material = [0, 0]
+    for square, piece in piece_map.items():
+        material[piece.color] += get_piece_value(piece.piece_type, 1.0)
+    total_material = sum(material) - get_piece_value(chess.KING, 1.0) * 2
+    return min(1.0, total_material / (
+        16 * get_piece_value(chess.PAWN, 1.0) +
+        4 * get_piece_value(chess.KNIGHT, 1.0) +
+        4 * get_piece_value(chess.BISHOP, 1.0) +
+        4 * get_piece_value(chess.ROOK, 1.0) +
+        2 * get_piece_value(chess.QUEEN, 1.0)
+    ))
+
 
 def evaluate(board):
     global zobrist_key
@@ -166,27 +181,27 @@ def evaluate(board):
     for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
         for piece_square in board.pieces(piece_type, chess.WHITE):
             attacks = get_attacks(board, piece_square)
-            white_mobility += len(attacks)
+            white_mobility += 0.5*len(attacks)
             white_attackers |= attacks
         for piece_square in board.pieces(piece_type, chess.BLACK):
             attacks = get_attacks(board, piece_square)
-            black_mobility += len(attacks)
+            black_mobility += 0.5*len(attacks)
             black_attackers |= attacks
     for square in CENTER_SQUARES:
         piece = board.piece_at(square)
         if piece and piece.piece_type == chess.PAWN:
-            center_control_score += 30 if piece.color == chess.WHITE else -30
+            center_control_score += 10 if piece.color == chess.WHITE else -10
         if square in white_attackers:
-            center_control_score += 10
+            center_control_score += 3
         if square in black_attackers:
-            center_control_score -= 10
+            center_control_score -= 3
     for square in chess.SQUARES:
         rank = chess.square_rank(square)
         if rank >= 3 and square in white_attackers and square not in black_attackers:
-            space_score += 6
+            space_score += 2
         if rank <= 4 and square in black_attackers and square not in white_attackers:
-            space_score -= 6
-    mobility_weight = 4 * game_phase + 2 * (1 - game_phase)
+            space_score -= 2
+    mobility_weight = 3 * game_phase + 1.5 * (1 - game_phase)
     mobility_score = (white_mobility - black_mobility) * mobility_weight
     total_score += mobility_score + center_control_score + space_score
     #print(total_score)
@@ -352,6 +367,9 @@ def evaluate(board):
 
 if __name__ == "__main__":
     board1 = chess.Board()
+    tic = time.perf_counter()
     board1.push_san("e2e4")
+    toc = time.perf_counter()
+    print(f"Time taken to make move: {toc - tic:0.8f} seconds")
 
     print(evaluate(board1))
