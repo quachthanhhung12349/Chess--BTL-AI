@@ -64,7 +64,7 @@ GAME_MODE = "game_mode"
 PVP_MODE = "pvp_mode"
 PVE_MODE = "pve_mode"
 COLOR_SELECTION = "color_selection"  # Added for PVE color selection
-AI_MATCHING_MODE = "ai_matching_mode"
+#AI_MATCHING_MODE = "ai_matching_mode"
 NO_TIMER = "unlimited_mode"
 
 BOARD_SIZE = 800

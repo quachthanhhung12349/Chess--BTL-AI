@@ -7,7 +7,7 @@ import evaluation_advanced
 import random
 import chess.polyglot # Import polyglot for opening book
 import sys
-import stockfishForWin
+import stockfish
 import os
 import asyncio
 import platform
@@ -58,6 +58,7 @@ history_table = [[0 for _ in range(64)] for _ in range(64)]
 
 # Global variable to hold the loaded opening book
 opening_book = None
+syzygy_tablebase = None
 
 def piece_count(board):
     """Counts the number of pieces on the board."""
@@ -86,7 +87,7 @@ def load_syzygy_tablebase(syzygy_path):
         print(f"Syzygy tablebase loaded from {syzygy_path}")
     except Exception as e:
         print("Could not load Syzygy tablebase from {SYZYGY_PATH}: {e}")
-        syzygy_tablebase = None # Ensure tablebase is None if loading fails
+        syzygy_path = None # Ensure tablebase is None if loading fails
 
 PIECE_VALUES = {
     chess.PAWN: 1,
@@ -234,7 +235,8 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
 
     if qs_depth == 0:
         #print(board)
-        #print(move_sequence, evaluation_advanced.evaluate(board)
+        #print(move_sequence, evaluation_advanced.evaluate(board))
+        #time.sleep(0.05)
         return evaluation_advanced.evaluate(board) * color, None # Return value and None for move
 
     stand_pat = evaluation_advanced.evaluate(board) * color
@@ -377,7 +379,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
     # For simplicity in this example, we'll skip the endgame check, but it's important
     # in a real engine.
 
-    if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
+    """if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
         
         # Make a null move (toggle turn, handle potential en passant square cleanup)
         original_turn = board.turn
@@ -582,6 +584,7 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
     """
     # --- Opening Book Lookup ---
     global current_best_move, search_value, cnt, max_depth_current
+    global opening_book, syzygy_tablebase
 
     current_best_move = None
     search_value = None
@@ -599,8 +602,8 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
             # print("Error or position not in book: {e}") # Optional: log book errors
             pass  # Continue to search if book fails
     # --- End Opening Book Lookup ---
-
-
+    else:
+        load_opening_book(OPENING_BOOK_PATH)
 
     if syzygy_tablebase and piece_count(board) <= TABLEBASE_PIECE_LIMIT:
         best_move_so_far = None
@@ -638,6 +641,8 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
             # Handle potential errors during tablebase probing
             print(f"Error during tablebase probing: {e}")
             pass # Fall through to search
+    elif not syzygy_tablebase:
+        load_syzygy_tablebase(SYZYGY_PATH)
 
     start_time = time.time()
     stop_time = start_time + stop_time
@@ -784,6 +789,7 @@ async def play_match(num_games=10, your_elo=2200, stockfish_elo=2400):
         # Play the specified number of games
         for game_num in range(1, num_games + 1):
             board = chess.Board()
+            #board.set_fen("rnbqkb1r/p4ppp/2pp1n2/1p2p3/4P3/2NB1Q2/PPPP1PPP/R1B2KNR w KQkq - 0 1")
 
             # Alternate who plays white
             your_color = chess.WHITE if game_num % 2 == 1 else chess.BLACK

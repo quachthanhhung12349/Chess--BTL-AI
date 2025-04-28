@@ -122,7 +122,7 @@ class GameMenu():
         self.overlay_max_alpha = 180
 
     def create_buttons(self):
-        labels = ["PvP", "PvE", "AI Matching"]
+        labels = ["PvP", "PvE"]
         for i, text in enumerate(labels):
             x = WIDTH // 2 - 150
             y = 250 + i * 120
@@ -235,8 +235,6 @@ class GameMenu():
                     return PVP_MODE
                 elif i == 1:
                     return PVE_MODE
-                elif i == 2:
-                    return AI_MATCHING_MODE
 
 class Button():
     def __init__(self, button_pos_x, button_pos_y, button_width, button_height, button_text, button_color):
