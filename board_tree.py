@@ -798,7 +798,7 @@ async def play_match(num_games=10, your_elo=2200, stockfish_elo=2400):
             while not game_end(board):
                 if board.turn == your_color:
                     # Your engine's move
-                    best_move = find_best_move_iterative_deepening_tt_book_aw(board, 11, 7)
+                    best_move = find_best_move_iterative_deepening_tt_book_aw(board, 20, 7)
                 else:
                     # Stockfish's move
                     limit = chess.engine.Limit(depth=5)
