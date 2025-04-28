@@ -41,7 +41,7 @@ transposition_table = {}
 MAX_SEARCH_DEPTH = 20 # Define a reasonable maximum search depth for table size
 KILLER_MOVES_COUNT = 2 # Store up to 2 killer moves per depth
 TABLEBASE_PIECE_LIMIT = 5 # Define the maximum number of pieces for Syzygy tablebase probing
-QS_MAX_DEPTH = 1 # Define the maximum depth for quiescence search
+QS_MAX_DEPTH = 3 # Define the maximum depth for quiescence search
 
 FUTILITY_MARGINS = [0, 200, 300] # Margins for depths 0, 1, 2 (adjust as needed)
 
@@ -58,6 +58,7 @@ history_table = [[0 for _ in range(64)] for _ in range(64)]
 
 # Global variable to hold the loaded opening book
 opening_book = None
+syzygy_tablebase = None
 
 def piece_count(board):
     """Counts the number of pieces on the board."""
@@ -82,8 +83,8 @@ def load_syzygy_tablebase(syzygy_path):
     """Loads the Syzygy tablebase."""
     global syzygy_tablebase
     try:
-        syzygy_tablebase = chess.syzygy.open_tablebase(SYZYGY_PATH)
-        print(f"Syzygy tablebase loaded from {SYZYGY_PATH}")
+        syzygy_tablebase = chess.syzygy.open_tablebase(syzygy_path)
+        print(f"Syzygy tablebase loaded from {syzygy_path}")
     except Exception as e:
         print("Could not load Syzygy tablebase from {SYZYGY_PATH}: {e}")
         syzygy_path = None # Ensure tablebase is None if loading fails
@@ -600,8 +601,8 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
             # print("Error or position not in book: {e}") # Optional: log book errors
             pass  # Continue to search if book fails
     # --- End Opening Book Lookup ---
-
-
+    else:
+        load_opening_book(OPENING_BOOK_PATH)
 
     if syzygy_tablebase and piece_count(board) <= TABLEBASE_PIECE_LIMIT:
         best_move_so_far = None
@@ -639,7 +640,9 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
             # Handle potential errors during tablebase probing
             print(f"Error during tablebase probing: {e}")
             pass # Fall through to search
-
+    elif not syzygy_tablebase:
+        load_syzygy_tablebase(SYZYGY_PATH)
+    
     start_time = time.time()
     stop_time = start_time + stop_time
 
