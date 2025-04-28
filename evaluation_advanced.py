@@ -1,7 +1,6 @@
 import time
 import chess
 import chess.polyglot
-from chess.polyglot import zobrist_hash
 
 from constant import CENTER_SQUARES, EXTENDED_CENTER, FORK_BONUS, FORK_CHECK_BONUS, PIN_ABSOLUTE_BONUS
 from dynamic_PstAndPieceValue import get_piece_value, get_pst

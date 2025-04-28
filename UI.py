@@ -1,8 +1,6 @@
 
 #UI UX controller
 import pygame
-import os
-import chess
 from constant import *
 import tkinter as tk
 from tkinter import filedialog

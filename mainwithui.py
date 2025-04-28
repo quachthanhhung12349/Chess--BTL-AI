@@ -387,15 +387,6 @@ class Game:
                         self.game_state = GAME_MODE_MENU
                         break
             elif self.game_state == GAME_MODE:
-                # if event.type == pygame.KEYDOWN:
-                #   if event.key == pygame.K_ESCAPE:
-                #      self.game_state = MAIN_MENU_WITH_BUTTONS
-                #     self.game_mode = None
-                #     self.selected_square = None
-                #     self.legal_targets = []
-                #    self.game.reset_game()
-
-                # Handle resign button clicks based on player's color in PVE mode
                 if self.game_mode == PVE_MODE:
                     if self.player_color == chess.WHITE and self.resign_white_button.is_clicked(event):
                         self.game.declare_winner(chess.BLACK)

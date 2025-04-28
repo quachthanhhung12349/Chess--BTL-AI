@@ -2,12 +2,10 @@ import chess
 import chess.engine
 import chess.syzygy
 import time
-import evaluation_simple
 import evaluation_advanced
 import random
 import chess.polyglot # Import polyglot for opening book
 import sys
-import stockfish
 import os
 import asyncio
 import platform
