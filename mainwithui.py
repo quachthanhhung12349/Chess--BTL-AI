@@ -62,7 +62,6 @@ class Game:
         self.color_confirmation_timer = 0  # Timer for showing color confirmation
         self.color_confirmation_duration = 1000  # Show confirmation for 1 second
         self.player_just_moved = False
-
     def handle_game_over(self):
         self.game_over = True
         self.game_result_text = self.game.get_game_result()
@@ -105,15 +104,16 @@ class Game:
 
     def update_timer(self, dt):
         if self.game_mode in [PVP_MODE, PVE_MODE] and self.game_mode != NO_TIMER and not self.game.is_game_over():
-            time_elapsed = dt / 1000.0  # Chuyển đổi milliseconds sang giây
-            if self.current_player == chess.WHITE:
-                self.player1_time -= time_elapsed
-                if self.player1_time < 0:
-                    self.game.declare_winner(chess.BLACK)  # đen thắng
-            else:
-                self.player2_time -= time_elapsed
-                if self.player2_time < 0:
-                    self.game.declare_winner(chess.WHITE)  # trắng thắng
+            if self.base_time >= 0 and not self.game.is_game_over():
+                time_elapsed = dt / 1000.0  # Chuyển đổi milliseconds sang giây
+                if self.current_player == chess.WHITE:
+                    self.player1_time -= time_elapsed
+                    if self.player1_time < 0:
+                        self.game.declare_winner(chess.BLACK)  # đen thắng
+                else:
+                    self.player2_time -= time_elapsed
+                    if self.player2_time < 0:
+                        self.game.declare_winner(chess.WHITE)  # trắng thắng
 
     def format_time(self, seconds):
         if seconds < 0:
@@ -365,7 +365,7 @@ class Game:
                         elif button.button_text == "Standard":
                             self.base_time = 1800  # 30p
                         elif button.button_text == "No Timer":
-                            self.game_mode = NO_TIMER
+                            self.base_time = -1
                             self.game_state = GAME_MODE
                             break
                         self.reset_timer()
@@ -473,7 +473,7 @@ class Game:
                     print(
                         f"AI turn - Current turn: {'White' if self.board.turn == chess.WHITE else 'Black'}, Player color: {'White' if self.player_color == chess.WHITE else 'Black'}")
                     depth = 8
-                    time_limit_sec = 5
+                    time_limit_sec = 6
                     start_time = time.time()
                     best_move = find_best_move_iterative_deepening_tt_book_aw(self.board, depth, time_limit_sec)
                     elapsed_time = time.time() - start_time

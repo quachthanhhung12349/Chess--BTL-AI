@@ -9,13 +9,14 @@ import sys
 import stockfish
 import os
 import asyncio
+import platform
 
 script_dir = os.path.dirname(__file__)
 
 OPENING_BOOK_PATH = os.path.join(script_dir, "Data/Perfect2023.bin") # Update this path to your opening book file
 # Define the path to your opening book file
 
-if sys.platform.system() == "Windows":
+if platform.system() == "Windows":
     STOCKFISH_PATH = os.path.join(script_dir, "stockfishForWin/stockfish-windows-x86-64-avx2.exe")  # Đường dẫn cho Windows
 else:
     STOCKFISH_PATH = os.path.join(script_dir, "stockfish/stockfish-ubuntu-x86-64-avx2")  # Đường dẫn cho Linux
@@ -673,7 +674,7 @@ def calculate_elo_change(rating_a, rating_b, result):
     return change
 
 
-async def play_match(num_games=100, your_elo=1200, stockfish_elo=2200):
+async def play_match(num_games=10, your_elo=2200, stockfish_elo=2400):
     """Play a match between your engine and Stockfish with specified Elo settings"""
     if not os.path.exists(STOCKFISH_PATH):
         print(f"Error: Stockfish executable not found at '{STOCKFISH_PATH}'")
@@ -711,7 +712,7 @@ async def play_match(num_games=100, your_elo=1200, stockfish_elo=2200):
             while not game_end(board):
                 if board.turn == your_color:
                     # Your engine's move
-                    best_move = find_best_move_iterative_deepening_tt_book_aw(board, 8, 5)
+                    best_move = find_best_move_iterative_deepening_tt_book_aw(board, 11, 7)
                 else:
                     # Stockfish's move
                     limit = chess.engine.Limit(depth=5)
@@ -779,7 +780,7 @@ async def main():
         exit()
 
         # Play 50 games against Stockfish with Elo 2200, starting from 1200
-    await play_match(num_games=100, your_elo=1500, stockfish_elo=2200)
+    await play_match(num_games=10, your_elo=2200, stockfish_elo=2400)
 
 
 if __name__ == "__main__":
