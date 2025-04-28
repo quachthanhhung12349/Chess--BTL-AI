@@ -414,21 +414,6 @@ class Game:
 
                 if self.game_mode in [PVP_MODE, PVE_MODE, NO_TIMER]:
                     self.handle_player_click(event)
-
-                elif self.game_mode == PVE_MODE and self.board.turn == chess.BLACK:
-                     """AI random"""
-                     legal_moves = list(self.board.legal_moves)
-                     if legal_moves:
-                         import random
-                         move = random.choice(legal_moves)
-                         self.game.push_move(move)
-                         self.board = self.game.get_board()
-                         self.current_player = not self.current_player  # Chuyển lượt
-            #         """AI minimax"""
-            #         _, best_move = minimax(self.board, depth=3, alpha=float('-inf'), beta=float('inf'), is_maximizing=True)
-            #         if best_move:
-            #             self.board.push(best_move)
-            #             self.current_player = not self.current_player # Chuyển lượt
             elif self.game_state == GAME_OVER_SCREEN:
                 if pygame.time.get_ticks() - self.game_over_time > 3000:
                     if self.rematch_button and self.rematch_button.is_clicked(event):

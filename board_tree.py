@@ -7,7 +7,7 @@ import evaluation_advanced
 import random
 import chess.polyglot # Import polyglot for opening book
 import sys
-import stockfish
+import stockfishForWin
 import os
 import asyncio
 import platform
@@ -41,7 +41,7 @@ transposition_table = {}
 MAX_SEARCH_DEPTH = 20 # Define a reasonable maximum search depth for table size
 KILLER_MOVES_COUNT = 2 # Store up to 2 killer moves per depth
 TABLEBASE_PIECE_LIMIT = 5 # Define the maximum number of pieces for Syzygy tablebase probing
-QS_MAX_DEPTH = 1 # Define the maximum depth for quiescence search
+QS_MAX_DEPTH = 3 # Define the maximum depth for quiescence search
 
 FUTILITY_MARGINS = [0, 200, 300] # Margins for depths 0, 1, 2 (adjust as needed)
 
@@ -82,11 +82,11 @@ def load_syzygy_tablebase(syzygy_path):
     """Loads the Syzygy tablebase."""
     global syzygy_tablebase
     try:
-        syzygy_tablebase = chess.syzygy.open_tablebase(SYZYGY_PATH)
-        print(f"Syzygy tablebase loaded from {SYZYGY_PATH}")
+        syzygy_tablebase = chess.syzygy.open_tablebase(syzygy_path)
+        print(f"Syzygy tablebase loaded from {syzygy_path}")
     except Exception as e:
         print("Could not load Syzygy tablebase from {SYZYGY_PATH}: {e}")
-        syzygy_path = None # Ensure tablebase is None if loading fails
+        syzygy_tablebase = None # Ensure tablebase is None if loading fails
 
 PIECE_VALUES = {
     chess.PAWN: 1,
@@ -234,8 +234,7 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
 
     if qs_depth == 0:
         #print(board)
-        #print(move_sequence, evaluation_advanced.evaluate(board))
-        time.sleep(0.05)
+        #print(move_sequence, evaluation_advanced.evaluate(board)
         return evaluation_advanced.evaluate(board) * color, None # Return value and None for move
 
     stand_pat = evaluation_advanced.evaluate(board) * color
@@ -860,7 +859,7 @@ async def main():
         print("Please download Stockfish and update the STOCKFISH_PATH variable.")
         exit()
 
-        # Play 50 games against Stockfish with Elo 2200, starting from 1200
+        # Play ??? games against Stockfish with Elo 2200, starting from 1200
     await play_match(num_games=10, your_elo=2200, stockfish_elo=2400)
 
 
