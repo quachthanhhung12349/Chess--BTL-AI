@@ -379,7 +379,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
     # For simplicity in this example, we'll skip the endgame check, but it's important
     # in a real engine.
 
-    if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
+    """if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
         
         # Make a null move (toggle turn, handle potential en passant square cleanup)
         original_turn = board.turn
@@ -789,6 +789,7 @@ async def play_match(num_games=10, your_elo=2200, stockfish_elo=2400):
         # Play the specified number of games
         for game_num in range(1, num_games + 1):
             board = chess.Board()
+            #board.set_fen("rnbqkb1r/p4ppp/2pp1n2/1p2p3/4P3/2NB1Q2/PPPP1PPP/R1B2KNR w KQkq - 0 1")
 
             # Alternate who plays white
             your_color = chess.WHITE if game_num % 2 == 1 else chess.BLACK
@@ -806,6 +807,8 @@ async def play_match(num_games=10, your_elo=2200, stockfish_elo=2400):
 
                 # Make the move
                 board.push(best_move)
+                print(best_move)
+                print(board)
 
             # Game result
             outcome = board.outcome()
