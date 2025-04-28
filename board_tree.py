@@ -236,7 +236,7 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
     if qs_depth == 0:
         #print(board)
         #print(move_sequence, evaluation_advanced.evaluate(board))
-        time.sleep(0.05)
+        #time.sleep(0.05)
         return evaluation_advanced.evaluate(board) * color, None # Return value and None for move
 
     stand_pat = evaluation_advanced.evaluate(board) * color
