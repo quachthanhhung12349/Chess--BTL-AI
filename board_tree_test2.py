@@ -37,7 +37,7 @@ history_table = [[0 for _ in range(64)] for _ in range(64)]
 
 # Define the path to your opening book file
 # Make sure you have a Polyglot (.bin) opening book file
-OPENING_BOOK_PATH = "/home/linux-mint-cb303/Desktop/UET/HK2 2024/AI/Chess--BTL-AI-/Perfect2023.bin" # <--- Update this path
+OPENING_BOOK_PATH = "Perfect2023.bin" # <--- Update this path
 
 # Global variable to hold the loaded opening book
 opening_book = None

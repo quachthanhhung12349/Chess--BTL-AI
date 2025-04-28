@@ -10,16 +10,17 @@ import sys
 import stockfish
 import os
 import asyncio
+import platform
 
 script_dir = os.path.dirname(__file__)
 
 OPENING_BOOK_PATH = os.path.join(script_dir, "Data/Perfect2023.bin") # Update this path to your opening book file
 # Define the path to your opening book file
-
-STOCKFISH_PATH = os.path.join(script_dir, "stockfish/stockfish-ubuntu-x86-64-avx2")
-
 SYZYGY_PATH = os.path.join(script_dir, "Data/syzygy_endgame") # Update this path to your Syzygy tablebase directory
-
+if platform.system() == "Windows":
+    STOCKFISH_PATH = os.path.join(script_dir, "stockfishForWin/stockfish-windows-x86-64-avx2.exe")  # Đường dẫn cho Windows
+else:
+    STOCKFISH_PATH = os.path.join(script_dir, "stockfish/stockfish-ubuntu-x86-64-avx2")  # Đường dẫn cho Linux
 sys.setrecursionlimit(10000) # Increase recursion limit for deep searches
 
 # Define infinity
@@ -83,10 +84,6 @@ def load_syzygy_tablebase(syzygy_path):
     try:
         syzygy_tablebase = chess.syzygy.open_tablebase(SYZYGY_PATH)
         print(f"Syzygy tablebase loaded from {SYZYGY_PATH}")
-                # --- Debug Prints ---
-        print(f"Type of loaded tablebase object: {type(syzygy_tablebase)}")
-        print(f"Does loaded tablebase object have 'probe' attribute? {hasattr(syzygy_tablebase, 'probe')}")
-        print(f"Does loaded tablebase object have 'probe_moves' attribute? {hasattr(syzygy_tablebase, 'probe_moves')}")
     except Exception as e:
         print("Could not load Syzygy tablebase from {SYZYGY_PATH}: {e}")
         syzygy_path = None # Ensure tablebase is None if loading fails
@@ -236,8 +233,8 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
     # --- End Time Check ---
 
     if qs_depth == 0:
-        print(board)
-        print(move_sequence, evaluation_advanced.evaluate(board))
+        #print(board)
+        #print(move_sequence, evaluation_advanced.evaluate(board))
         time.sleep(0.05)
         return evaluation_advanced.evaluate(board) * color, None # Return value and None for move
 
@@ -283,7 +280,7 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
         if alpha >= beta:
             break
     
-    if (qs_depth > 0): print(best_value, best_move)
+    #if (qs_depth > 0): print(best_value, best_move)
     return best_value, best_move # Return best value found in QS
 
 def calculate_lmr_reduction(depth, move_index):
@@ -367,8 +364,8 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
         value, _ = quiescence_search(board, alpha, beta, color, QS_MAX_DEPTH, start_time, stop_time)
         if value is None and _ is None: return None, None # Handle timeout from QS
         return value, None
-    
-    """# --- Null Move Pruning ---
+
+    # --- Null Move Pruning ---
     # Conditions for applying NMR:
     # 1. Sufficient remaining depth.
     # 2. Not in check (Null Move is unsound when in check).
@@ -450,7 +447,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
     original_alpha = alpha # Store original alpha for TT flag determination
 
     for move_index, move in enumerate(move_order):
-        
+
         # --- Time Check ---
         if time.time() > stop_time:
              return None, None
@@ -513,7 +510,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
              
 
              value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, stop_time, principal_variation)
-             
+
 
              # --- Handle Time Termination ---
              if value is None and _ is None:
@@ -750,84 +747,126 @@ def game_end(board):
         return True
     return False
 
+def calculate_elo_change(rating_a, rating_b, result):
+    """Calculate Elo rating change based on result (1.0 for win, 0.5 for draw, 0.0 for loss)"""
+    k_factor = 32  # Standard K-factor for Elo calculations
+    expected_a = 1.0 / (1.0 + 10**((rating_b - rating_a) / 400))
+    change = k_factor * (result - expected_a)
+    return change
+
+
+async def play_match(num_games=10, your_elo=2200, stockfish_elo=2400):
+    """Play a match between your engine and Stockfish with specified Elo settings"""
+    if not os.path.exists(STOCKFISH_PATH):
+        print(f"Error: Stockfish executable not found at '{STOCKFISH_PATH}'")
+        print("Please download Stockfish and update the STOCKFISH_PATH variable.")
+        return
+
+    # Initialize game statistics
+    your_wins = 0
+    stockfish_wins = 0
+    draws = 0
+    your_current_elo = your_elo
+
+    engine = None
+    try:
+        # Start Stockfish engine
+        print(f"Starting Stockfish engine from: {STOCKFISH_PATH}")
+        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+        print("Stockfish engine started successfully.")
+
+        # Set Stockfish Elo rating
+        engine.configure({"UCI_LimitStrength": True, "UCI_Elo": stockfish_elo})
+        print(f"Stockfish Elo set to: {stockfish_elo}")
+        print(f"Your starting Elo: {your_elo}")
+        print(f"\n{'Game':<6}{'Result':<10}{'Elo Change':<12}{'New Elo':<10}")
+        print("-" * 38)
+
+        # Play the specified number of games
+        for game_num in range(1, num_games + 1):
+            board = chess.Board()
+
+            # Alternate who plays white
+            your_color = chess.WHITE if game_num % 2 == 1 else chess.BLACK
+
+            # Play the game
+            while not game_end(board):
+                if board.turn == your_color:
+                    # Your engine's move
+                    best_move = find_best_move_iterative_deepening_tt_book_aw(board, 11, 7)
+                else:
+                    # Stockfish's move
+                    limit = chess.engine.Limit(depth=5)
+                    result = engine.play(board, limit)
+                    best_move = result.move
+
+                # Make the move
+                board.push(best_move)
+
+            # Game result
+            outcome = board.outcome()
+            if outcome is None:
+                # Handle stalemate or insufficient material
+                if board.is_stalemate() or board.is_insufficient_material():
+                    result = "Draw"
+                    draws += 1
+                    result_value = 0.5
+                else:
+                    # This should not happen if game_end is implemented correctly
+                    result = "Draw"  # Default to draw
+                    draws += 1
+                    result_value = 0.5
+            elif outcome.winner == your_color:
+                result = "Win"
+                your_wins += 1
+                result_value = 1.0
+            elif outcome.winner is None:  # Draw
+                result = "Draw"
+                draws += 1
+                result_value = 0.5
+            else:  # Stockfish wins
+                result = "Loss"
+                stockfish_wins += 1
+                result_value = 0.0
+
+            # Update your Elo rating
+            elo_change = calculate_elo_change(your_current_elo, stockfish_elo, result_value)
+            your_current_elo += elo_change
+
+            # Print simple result line
+            print(f"{game_num:<6}{result:<10}{elo_change:+.2f}      {your_current_elo:.2f}")
+
+            # Clear transposition table between games if you're using one
+            if 'transposition_table' in globals():
+                transposition_table.clear()
+
+        # Final statistics
+        print("\n=== Final Results ===")
+        print(f"Games: {num_games} | Wins: {your_wins} | Draws: {draws} | Losses: {stockfish_wins}")
+        print(f"Final Elo: {your_current_elo:.2f} ({your_current_elo - your_elo:+.2f})")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        if engine:
+            print("\nShutting down Stockfish engine.")
+            engine.quit()
+            print("Engine shut down.")
 # Example usage:
 # Assuming 'initial_board' is a chess.Board object
 async def main():
-    
-    board = chess.Board()
-
     if not os.path.exists(STOCKFISH_PATH):
         print(f"Error: Stockfish executable not found at '{STOCKFISH_PATH}'")
         print("Please download Stockfish and update the STOCKFISH_PATH variable.")
         exit()
-    #board.push_san("d2d4")
-    board.set_fen("8/q7/P6k/Q7/8/8/8/6K1 w - - 0 1")
-  
-    engine = None # Initialize engine variable to None
-    try:
-        # This starts the Stockfish process and connects to it
-        print(f"Starting Stockfish engine from: {STOCKFISH_PATH}")
-        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-        print("Stockfish engine started successfully.")
-    except FileNotFoundError:
-        print(f"Error: Could not find Stockfish executable at '{STOCKFISH_PATH}'")
-        print("Please check the path and try again.")
-        exit()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        exit()
 
+        # Play 50 games against Stockfish with Elo 2200, starting from 1200
+    await play_match(num_games=10, your_elo=2200, stockfish_elo=2400)
 
-    while True:
-        tic = time.perf_counter()
-        best_move = find_best_move_iterative_deepening_tt_book_aw(board, 20, 10)
-        toc = time.perf_counter()
-        print(toc - tic)
-        print(best_move)
-        board.push_san(str(best_move))
-        print(board)
-        print("")
-        if game_end(board):
-            break
-        
-        if(engine):
-            limit = chess.engine.Limit(depth=5) # Think to depth 15
-            
-            print(f"\nAsking Stockfish for the best move with limit: {limit}")
-            result = engine.play(board, limit)
-
-            best_move = result.move
-            ponder_move = result.ponder
-
-            print(f"\nStockfish's Best Move: {best_move}")
-            if ponder_move:
-                print(f"Stockfish's Ponder Move: {ponder_move}")
-
-            board.push(best_move)
-
-            print("\nBoard after Stockfish's move:")
-            print(board)
-            if game_end(board):
-                break
-        """legal_move_made = False
-        while not legal_move_made:
-            try:
-                move = input("Enter your move: ")
-                board.push_san(move)
-                print(board)
-                print("")
-                legal_move_made = True
-            except ValueError:
-                print("Invalid move. Please try again.")"""
-
-    print(board.outcome())
-    if engine:
-        print("\nShutting down Stockfish engine.")
-        engine.quit() # IMPORTANT: Always shut down the engine process
-        print("Engine shut down.")
 
 if __name__ == "__main__":
-    load_opening_book(OPENING_BOOK_PATH) # Load the opening book at the start
-    load_syzygy_tablebase(SYZYGY_PATH) # Load the Syzygy tablebase at the start
+    if 'load_opening_book' in globals():
+        load_opening_book(OPENING_BOOK_PATH)  # Load the opening book if function exists
+    if 'load_syzygy_tablebase' in globals():
+        load_syzygy_tablebase(SYZYGY_PATH)
     asyncio.run(main())
-    # Uncomment the line below to run the main function
