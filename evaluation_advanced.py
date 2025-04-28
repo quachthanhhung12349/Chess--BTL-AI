@@ -19,6 +19,15 @@ open_files_cache = {}
 semi_open_files_cache = {}
 piece_map_cache = {}
 
+def piece_count(board):
+    """Get piece count for each color, cached."""
+    cache_key = zobrist_key
+    if cache_key not in piece_map_cache:
+        piece_map_cache[cache_key] = board.piece_map()
+    piece_map = piece_map_cache[cache_key]
+    piece_count = sum(1 for square, piece in piece_map.items())
+    return piece_count
+
 def get_attacks(board, square):
     """Get attack squares for a piece, cached."""
     cache_key = (zobrist_key, square)
@@ -371,5 +380,5 @@ if __name__ == "__main__":
     board1.push_san("e2e4")
     toc = time.perf_counter()
     print(f"Time taken to make move: {toc - tic:0.8f} seconds")
-
+    print(piece_count(board1))
     print(evaluate(board1))

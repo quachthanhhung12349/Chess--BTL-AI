@@ -1,5 +1,6 @@
 import chess
 import chess.engine
+import chess.syzygy
 import time
 import evaluation_simple
 import evaluation_advanced
@@ -16,6 +17,9 @@ OPENING_BOOK_PATH = os.path.join(script_dir, "Data/Perfect2023.bin") # Update th
 # Define the path to your opening book file
 
 STOCKFISH_PATH = os.path.join(script_dir, "stockfish/stockfish-ubuntu-x86-64-avx2")
+
+SYZYGY_PATH = os.path.join(script_dir, "Data/syzygy_endgame") # Update this path to your Syzygy tablebase directory
+
 sys.setrecursionlimit(10000) # Increase recursion limit for deep searches
 
 # Define infinity
@@ -35,35 +39,57 @@ transposition_table = {}
 # Add global tables for Killer Moves and History Heuristic
 MAX_SEARCH_DEPTH = 20 # Define a reasonable maximum search depth for table size
 KILLER_MOVES_COUNT = 2 # Store up to 2 killer moves per depth
+TABLEBASE_PIECE_LIMIT = 5 # Define the maximum number of pieces for Syzygy tablebase probing
+QS_MAX_DEPTH = 1 # Define the maximum depth for quiescence search
 
+FUTILITY_MARGINS = [0, 200, 300] # Margins for depths 0, 1, 2 (adjust as needed)
+
+NMR_MIN_DEPTH = 3 # Minimum remaining depth to apply NMR
+NMR_REDUCTION = 2 # Depth reduction for the null move search
+
+move_sequence = []
 # Initialize killer moves table with None (or chess.Move.null())
 # killer_moves[depth][move_index]
 killer_moves = [[None for _ in range(KILLER_MOVES_COUNT)] for _ in range(MAX_SEARCH_DEPTH)]
-
 # Initialize history table
 # history_table[from_square][to_square]
 history_table = [[0 for _ in range(64)] for _ in range(64)]
 
-
-
-
 # Global variable to hold the loaded opening book
 opening_book = None
+
+def piece_count(board):
+    """Counts the number of pieces on the board."""
+    piece_count = 0
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece is not None:
+            piece_count += 1
+    return piece_count
 
 def load_opening_book(book_path):
     """Loads the opening book."""
     global opening_book
     try:
         opening_book = chess.polyglot.open_reader(book_path)
-        print("Opening book loaded from {book_path}")
+        print(f"Opening book loaded from {book_path}")
     except Exception as e:
         print("Could not load opening book from {book_path}: {e}")
         opening_book = None # Ensure book is None if loading fails
 
-
-# Call this function once at the start of your program
-# load_opening_book(OPENING_BOOK_PATH)
-
+def load_syzygy_tablebase(syzygy_path):
+    """Loads the Syzygy tablebase."""
+    global syzygy_tablebase
+    try:
+        syzygy_tablebase = chess.syzygy.open_tablebase(SYZYGY_PATH)
+        print(f"Syzygy tablebase loaded from {SYZYGY_PATH}")
+                # --- Debug Prints ---
+        print(f"Type of loaded tablebase object: {type(syzygy_tablebase)}")
+        print(f"Does loaded tablebase object have 'probe' attribute? {hasattr(syzygy_tablebase, 'probe')}")
+        print(f"Does loaded tablebase object have 'probe_moves' attribute? {hasattr(syzygy_tablebase, 'probe_moves')}")
+    except Exception as e:
+        print("Could not load Syzygy tablebase from {SYZYGY_PATH}: {e}")
+        syzygy_path = None # Ensure tablebase is None if loading fails
 
 PIECE_VALUES = {
     chess.PAWN: 1,
@@ -101,6 +127,7 @@ def calculate_mvv_lva(board, move):
 
 
 def order_moves(board, current_depth, principal_variation=None, hash_move=None):
+
     """
     Orders moves for better alpha-beta pruning using MVV-LVA, Killer Moves, and History Heuristic.
     Args:
@@ -179,12 +206,26 @@ def order_moves(board, current_depth, principal_variation=None, hash_move=None):
 
     return ordered_moves_unique
 
-
+def order_moves_tablebase(board):
+    """
+    Orders moves using the Syzygy tablebase.
+    This is a placeholder function and should be implemented based on your needs.
+    """
+    # For now, let's just return the legal moves in random order
+    zeroing_moves = []
+    other_moves = []
+    for move in board.legal_moves:
+        if board.is_zeroing(move):
+            zeroing_moves.append(move)
+        else:
+            other_moves.append(move)
+    return zeroing_moves + other_moves
+    
 cnt = 0
-QS_MAX_DEPTH = 2
 # Assuming quiescence_search is implemented as previously discussed
 # (It will also need to accept start_time and stop_time)
 def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time):
+    global move_sequence
     """
     Performs a limited depth search focusing on noisy positions (captures, checks).
     Includes time checks.
@@ -195,6 +236,9 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
     # --- End Time Check ---
 
     if qs_depth == 0:
+        print(board)
+        print(move_sequence, evaluation_advanced.evaluate(board))
+        time.sleep(0.05)
         return evaluation_advanced.evaluate(board) * color, None # Return value and None for move
 
     stand_pat = evaluation_advanced.evaluate(board) * color
@@ -204,9 +248,12 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
 
     legal_moves = list(board.legal_moves)
     capture_moves = [move for move in legal_moves if board.is_capture(move)]
-    noisy_moves = capture_moves # + check_moves if implemented
+    check_moves = [move for move in legal_moves if board.gives_check(move)]
+    noisy_moves = capture_moves + check_moves # + check_moves if implemented
 
     if not noisy_moves:
+        #print(board)
+        #print(move_sequence, evaluation_advanced.evaluate(board))
         return stand_pat, None
 
     best_value = stand_pat
@@ -214,9 +261,12 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
 
     for move in noisy_moves:
         board.push(move)
+        move_sequence.append(str(move))
+        
         # Recursive call to quiescence search with time parameters
         value, _ = quiescence_search(board, -beta, -alpha, -color, qs_depth - 1, start_time, stop_time)
         board.pop()
+        move_sequence.pop() # Unmake the move from the sequence
 
         # --- Handle Time Termination from recursive call ---
         if _ is None and value is None:
@@ -232,7 +282,8 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
         alpha = max(alpha, best_value)
         if alpha >= beta:
             break
-
+    
+    if (qs_depth > 0): print(best_value, best_move)
     return best_value, best_move # Return best value found in QS
 
 def calculate_lmr_reduction(depth, move_index):
@@ -252,11 +303,6 @@ def calculate_lmr_reduction(depth, move_index):
 
     # Ensure reduction doesn't make depth negative
     return max(0, reduction)
-
-FUTILITY_MARGINS = [0, 200, 300] # Margins for depths 0, 1, 2 (adjust as needed)
-
-NMR_MIN_DEPTH = 3 # Minimum remaining depth to apply NMR
-NMR_REDUCTION = 2 # Depth reduction for the null move search
 
 max_depth_current = 0
 def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_variation=None):
@@ -322,7 +368,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
         if value is None and _ is None: return None, None # Handle timeout from QS
         return value, None
     
-    # --- Null Move Pruning ---
+    """# --- Null Move Pruning ---
     # Conditions for applying NMR:
     # 1. Sufficient remaining depth.
     # 2. Not in check (Null Move is unsound when in check).
@@ -335,7 +381,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
     # For simplicity in this example, we'll skip the endgame check, but it's important
     # in a real engine.
 
-    """if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
+    if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
         
         # Make a null move (toggle turn, handle potential en passant square cleanup)
         original_turn = board.turn
@@ -411,6 +457,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
         # --- End Time Check ---
 
         board.push(move)
+        move_sequence.append(str(move))
 
         # --- Principal Variation Search (PVS) and Late Move Reductions (LMR) ---
         should_do_full_depth_search = False
@@ -432,10 +479,10 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
             if current_search_depth > 0:
                  # Perform a null window search [beta - 1, beta]
                  value, _ = negamax(board, current_search_depth, -beta, -(alpha + 1), -color, start_time, stop_time, principal_variation) # Note: alpha + 1 for null window
-
                  # --- Handle Time Termination ---
                  if value is None:
                       board.pop() # Unmake before returning on time out
+                      move_sequence.pop()
                       return None, None
                  # --- End Time Termination Handling ---
                  value = -value # Negate the value from the recursive call
@@ -446,6 +493,7 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
                       should_do_full_depth_search = True # Flag for a full depth re-search
                       #print("LMR Fail High: Re-searching move {move} at depth {depth}") # Optional: log LMR failures
             else:
+                 
                  # If reduced depth is 0, we don't do a recursive call here.
                  # A full depth search (which will go to QS) is needed.
                  should_do_full_depth_search = True # Flag for a full depth search
@@ -462,26 +510,27 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
 
              # The window for the recursive call is always [-beta, -alpha] from the opponent's perspective.
              # The value is negated after the call.
+             
 
              value, _ = negamax(board, depth - 1, -beta, -alpha, -color, start_time, stop_time, principal_variation)
              
 
              # --- Handle Time Termination ---
              if value is None and _ is None:
-                  board.pop() # Unmake before returning on time out
+                  board.pop()
+                  move_sequence.pop() # Unmake before returning on time out
                   return None, None
              value = -value # Negate value
              # --- End Time Termination Handling ---
 
 
         board.pop() # Unmake the move
+        move_sequence.pop() # Unmake the move from the sequence
 
         # --- Update best value and best move ---
         if value > best_value:
             best_value = value
             best_move = move
-        """if (depth == max_depth_current):
-            print(move, value)"""
 
         # --- Alpha-Beta Pruning ---
         alpha = max(alpha, best_value)
@@ -554,6 +603,45 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
             # print("Error or position not in book: {e}") # Optional: log book errors
             pass  # Continue to search if book fails
     # --- End Opening Book Lookup ---
+
+
+
+    if syzygy_tablebase and piece_count(board) <= TABLEBASE_PIECE_LIMIT:
+        best_move_so_far = None
+        best_dtz = None
+        best_move_has_priority = False
+        move_order = order_moves_tablebase(board)
+        try:
+            for move in move_order:
+                move_has_priority = False
+                if (board.is_zeroing(move)):
+                    move_has_priority = True
+                board.push(move)
+                dtz = syzygy_tablebase.probe_dtz(board)
+                #print(move, dtz)
+                if (dtz < 0):
+                    #If we found a winning move: always prioritize zeroing moves that leads to zeroing the fastest. 
+                    #If there's no winning zeroing move (but still has another winning move otherwise), we will prioritize the other moves that leads to zeroing the fastest.
+                    if best_dtz is None or best_dtz >= 0 or (dtz > best_dtz and (move_has_priority or not best_move_has_priority)):
+                        best_dtz = dtz
+                        best_move_so_far = move
+                        best_move_has_priority = move_has_priority
+                elif (dtz > 0 and (best_dtz is None or best_dtz > 0)):
+                    if best_dtz is None or dtz > best_dtz:
+                        best_dtz = dtz
+                        best_move_so_far = move
+                elif (dtz == 0 and (best_dtz is None or best_dtz >= 0)):
+                    if best_dtz is None or best_dtz > 0:
+                        best_dtz = dtz
+                        best_move_so_far = move
+                board.pop()
+            print(f"Best move from tablebase: {best_move_so_far}, DTZ: {best_dtz}")
+            return best_move_so_far
+
+        except Exception as e:
+            # Handle potential errors during tablebase probing
+            print(f"Error during tablebase probing: {e}")
+            pass # Fall through to search
 
     start_time = time.time()
     stop_time = start_time + stop_time
@@ -667,13 +755,14 @@ def game_end(board):
 async def main():
     
     board = chess.Board()
+
     if not os.path.exists(STOCKFISH_PATH):
         print(f"Error: Stockfish executable not found at '{STOCKFISH_PATH}'")
         print("Please download Stockfish and update the STOCKFISH_PATH variable.")
         exit()
     #board.push_san("d2d4")
-    #board.set_fen("rnb1kbnr/pp1p1ppp/2p5/4q3/3PP3/2N5/PPP2PPP/R1BQKB1R b KQkq - 0 1")
-
+    board.set_fen("8/q7/P6k/Q7/8/8/8/6K1 w - - 0 1")
+  
     engine = None # Initialize engine variable to None
     try:
         # This starts the Stockfish process and connects to it
@@ -718,6 +807,8 @@ async def main():
 
             print("\nBoard after Stockfish's move:")
             print(board)
+            if game_end(board):
+                break
         """legal_move_made = False
         while not legal_move_made:
             try:
@@ -737,5 +828,6 @@ async def main():
 
 if __name__ == "__main__":
     load_opening_book(OPENING_BOOK_PATH) # Load the opening book at the start
+    load_syzygy_tablebase(SYZYGY_PATH) # Load the Syzygy tablebase at the start
     asyncio.run(main())
     # Uncomment the line below to run the main function
