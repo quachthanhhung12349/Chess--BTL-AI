@@ -234,9 +234,6 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
     # --- End Time Check ---
 
     if qs_depth == 0:
-        #print(board)
-        #print(move_sequence, evaluation_advanced.evaluate(board))
-        #time.sleep(0.05)
         return evaluation_advanced.evaluate(board) * color, None # Return value and None for move
 
     stand_pat = evaluation_advanced.evaluate(board) * color
@@ -250,8 +247,6 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
     noisy_moves = capture_moves + check_moves # + check_moves if implemented
 
     if not noisy_moves:
-        #print(board)
-        #print(move_sequence, evaluation_advanced.evaluate(board))
         return stand_pat, None
 
     best_value = stand_pat
@@ -281,7 +276,6 @@ def quiescence_search(board, alpha, beta, color, qs_depth, start_time, stop_time
         if alpha >= beta:
             break
     
-    #if (qs_depth > 0): print(best_value, best_move)
     return best_value, best_move # Return best value found in QS
 
 def calculate_lmr_reduction(depth, move_index):
@@ -315,7 +309,6 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
 
     if max_depth_current - 1 == depth:
         cnt += 1
-        #print(cnt)
     # --- Check for Immediate Game Over ---
     # Check this BEFORE transposition table lookup or depth check for terminal nodes
     if board.is_game_over(claim_draw=True): # claim_draw=True includes 50-move, 3-fold rep
@@ -365,77 +358,6 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
         value, _ = quiescence_search(board, alpha, beta, color, QS_MAX_DEPTH, start_time, stop_time)
         if value is None and _ is None: return None, None # Handle timeout from QS
         return value, None
-
-    # --- Null Move Pruning ---
-    # Conditions for applying NMR:
-    # 1. Sufficient remaining depth.
-    # 2. Not in check (Null Move is unsound when in check).
-    # 3. Not in an endgame (NMR can be unsound in positions with few pieces due to zugzwang).
-    #    A simple endgame check could be based on the total number of pieces or material.
-    # 4. Sufficient material (e.g., not just a lone king).
-
-    # A very simple endgame check: Check if total material is below a threshold.
-    # This requires a material count function or iterating over the board.
-    # For simplicity in this example, we'll skip the endgame check, but it's important
-    # in a real engine.
-
-    """if depth >= NMR_MIN_DEPTH + 1 and not board.is_check() and evaluation_advanced.get_game_phase(board) > 0.2: # Add endgame check here
-        
-        # Make a null move (toggle turn, handle potential en passant square cleanup)
-        original_turn = board.turn
-        original_ep_square = board.ep_square
-        board.turn = not board.turn
-        board.ep_square = None # En passant target is cleared after a null move
-        # Perform a reduced-depth search after the null move
-        # Use a narrow window [-beta, -beta + 1] for the null move probe
-        # Value is from the perspective of the player *after* the null move (the opponent)
-        null_move_value, _ = negamax(
-            board,
-            depth - NMR_REDUCTION - 1, # Subtract reduction and 1 ply for the null move
-            -beta,
-            -beta + 1, # Null window
-            -color, # Opponent's turn
-            start_time,
-            stop_time,
-            principal_variation # Pass PV (though its usefulness in null move is debatable)
-        )
-        # Unmake the null move
-        board.turn = original_turn
-        board.ep_square = original_ep_square
-
-        # --- Handle Time Termination from null move search ---
-        if null_move_value is None:
-            return None, None # Propagate termination
-        # --- End Time Termination Handling ---
-
-        # If the null move search resulted in a value >= beta (for the opponent),
-        # it means the opponent can't improve the position even with an extra move.
-        # This position is likely very good for the current player, so prune.
-        # The value from the null move search is from the opponent's perspective,
-        # so if null_move_value >= beta, it means the value for the current player is <= -beta.
-        # The cutoff condition is effectively if -null_move_value >= beta.
-        
-        if -null_move_value >= beta and cnt > 1:
-             #print("Null Move Pruning: {null_move_value} >= {beta} (depth {depth})")
-             # Null move pruning allows a beta cutoff. Return beta as the value.
-             return beta, None # Return beta and no specific move
-
-    # --- End Null Move Pruning ---
-    
-        # --- Futility Pruning ---
-    # Only apply at shallow depths and if not in check (checks introduce complexity)
-    # And if the alpha-beta window is not indicating a high-scoring node already
-    if depth < len(FUTILITY_MARGINS) and not board.is_check():
-         # Calculate the static evaluation from the current player's perspective
-         static_eval = evaluation_advanced.evaluate(board) * color
-         margin = FUTILITY_MARGINS[depth]
-
-         # If static eval + margin is still less than alpha, prune
-         if static_eval + margin <= alpha and cnt > 1:
-             # Return alpha (or alpha + 1) to signal that this branch is not better
-             # than the current best found so far.
-             # Using alpha is a common way to implement this cutoff.
-             return alpha, None # Return alpha and no specific move"""
 
     # --- Get hash move for move ordering ---
     hash_move = transposition_table.get(board_hash, {}).get('best_move')
@@ -489,7 +411,6 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
                  # We need to re-search with a full window and full depth.
                  if value > alpha: # Check against the original alpha
                       should_do_full_depth_search = True # Flag for a full depth re-search
-                      #print("LMR Fail High: Re-searching move {move} at depth {depth}") # Optional: log LMR failures
             else:
                  
                  # If reduced depth is 0, we don't do a recursive call here.
@@ -552,7 +473,6 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
 
 
             break # Beta cutoff
-    #if (depth == max_depth_current): print("")
     # --- Transposition Table Store ---
     if time.time() - start_time <= stop_time: # Check time again before storing
         flag = TT_EXACT
@@ -573,7 +493,6 @@ def negamax(board, depth, alpha, beta, color, start_time, stop_time, principal_v
             'best_move': best_move
         }
 
-    # print(best_value, best_move) # Optional debug
 
     return best_value, best_move
 
@@ -599,7 +518,7 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
                 print("Found book move: {book_move}")
                 return book_move
         except (IndexError, Exception) as e:
-            # print("Error or position not in book: {e}") # Optional: log book errors
+            print("Error or position not in book: {e}") # Optional: log book errors
             pass  # Continue to search if book fails
     # --- End Opening Book Lookup ---
     else:
@@ -617,7 +536,6 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
                     move_has_priority = True
                 board.push(move)
                 dtz = syzygy_tablebase.probe_dtz(board)
-                #print(move, dtz)
                 if (dtz < 0):
                     #If we found a winning move: always prioritize zeroing moves that leads to zeroing the fastest. 
                     #If there's no winning zeroing move (but still has another winning move otherwise), we will prioritize the other moves that leads to zeroing the fastest.
@@ -625,10 +543,12 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
                         best_dtz = dtz
                         best_move_so_far = move
                         best_move_has_priority = move_has_priority
+                    #If we found a drawing move, it will take priority over losing moves
                 elif (dtz > 0 and (best_dtz is None or best_dtz > 0)):
                     if best_dtz is None or dtz > best_dtz:
                         best_dtz = dtz
                         best_move_so_far = move
+                    #If we found a losing move (and no drawing/winning moves), find moves that makes it so that we lose as slowly as possible
                 elif (dtz == 0 and (best_dtz is None or best_dtz >= 0)):
                     if best_dtz is None or best_dtz > 0:
                         best_dtz = dtz
@@ -681,8 +601,6 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
             # Perform a depth-limited search with the current alpha-beta window
             search_value, current_best_move = negamax(board.copy(), depth, current_alpha, current_beta, color, start_time, stop_time,
                                                       principal_variation)
-            #print(start_time)
-            #print(time_left)
 
             # Check for timeout during the search
             if time.time() > stop_time or search_value is None:
@@ -695,7 +613,6 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
             if search_value < current_alpha:
                 # Fail low: The true value is <= the lower bound of the window.
                 # The window was too high. Re-search with a wider window
-                #print(f"Depth {depth} Fail Low (Value: {search_value}, Window: [{current_alpha}, {current_beta}]). Re-searching.")
                 current_beta = search_value + asp_window_level
                 current_alpha = search_value - asp_window_level
                 cnt = 0
@@ -703,7 +620,6 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
             elif search_value > current_beta:
                 # Fail high: The true value is >= the upper bound of the window.
                 # The window was too low. Re-search with a wider window
-                #print(f"Depth {depth} Fail High (Value: {search_value}, Window: [{current_alpha}, {current_beta}]). Re-searching.")
                 current_beta = search_value + asp_window_level
                 current_alpha = search_value - asp_window_level
                 cnt = 0
@@ -798,7 +714,7 @@ async def play_match(num_games=10, your_elo=2200, stockfish_elo=2400):
             while not game_end(board):
                 if board.turn == your_color:
                     # Your engine's move
-                    best_move = find_best_move_iterative_deepening_tt_book_aw(board, 11, 7)
+                    best_move = find_best_move_iterative_deepening_tt_book_aw(board, 20, 7)
                 else:
                     # Stockfish's move
                     limit = chess.engine.Limit(depth=5)
