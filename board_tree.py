@@ -584,7 +584,8 @@ def find_best_move_iterative_deepening_tt_book_aw(board, max_depth, stop_time):
     """
     # --- Opening Book Lookup ---
     global current_best_move, search_value, cnt, max_depth_current
-
+    global opening_book, syzygy_tablebase
+    
     current_best_move = None
     search_value = None
     cnt = 0
