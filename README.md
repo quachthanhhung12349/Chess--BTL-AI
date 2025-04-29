@@ -14,8 +14,11 @@ Link demo: https://drive.google.com/file/d/1H1IYUDg0K6NYLb53jT3lyOoJBoFxxXsK/vie
 ### Chế độ chơi:  
 + PvP: người chơi đấu với người chơi
 + PvE: Người chơi đấu với bot
++ (Mỗi chế độ chơi đều có thể chọn 1 trong các thể loại cờ như Blitz, Rapid, Standard, No Timer)
 ### Thuật toán AI sử dụng
-Minimax + Cắt tỉa alpha-beta để tìm ra nước đi tối ưu cho máy
++ Minimax + Cắt tỉa alpha-beta để tìm ra nước đi tối ưu cho máy
++ Syzygy tablebase cho tàn cuộc 5 nước
++ Các kĩ thuật tối ưu tìm kiếm(Iterative Deepening,negamax, aspiration window,...) và hàm đánh giá(King Safety, Pawn Structure,...)
 ### Thư viện sử dụng
 + Pygame, Tkinter: UI-UX
 + Python-chess: Logic game 
