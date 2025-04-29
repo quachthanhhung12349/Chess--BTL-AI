@@ -8,7 +8,7 @@
 
 ## Mô tả
 Bài tập lớn bộ môn AI, thiết kế một game Cờ vua. Chúng mình đã xây dựng một hệ thống cho phép người chơi chơi cờ vua đấu với nhau hoặc đấu với máy, sử dụng các thuật toán AI để đưa ra các nước đi tối ưu (đối với đấu với máy).   
-Link demo: 
+Link demo: https://drive.google.com/file/d/1H1IYUDg0K6NYLb53jT3lyOoJBoFxxXsK/view?usp=sharing
 
 ## Tính năng
 ### Chế độ chơi:  
